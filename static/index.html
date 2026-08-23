@@ -1,0 +1,164 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>小暖 💫</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💫</text></svg>">
+<link rel="stylesheet" href="/static/css/style.css?v=14">
+</head>
+<body>
+<canvas id="particleCanvas"></canvas>
+
+<!-- 顶部文本气泡 -->
+<div class="top-bubble" id="topBubble"></div>
+
+<!-- 角色信息和状态 -->
+<div style="position: relative; z-index: 10; margin: 10px 20px 0;">
+  <div class="top-title" id="topTitle" style="display:none"></div>
+  <div class="top-desc" id="topDesc" style="display:none"></div>
+  <div class="orb-status" id="orbStatus">持续通话中…<span id="verTag" style="margin-left:8px;opacity:.5;font-size:10px">v8</span></div>
+</div>
+
+<!-- 顶部按钮 -->
+<div class="topbar-actions">
+    <button id="backBtn" class="topbar-btn" title="返回">←</button>
+  <button id="favBtn" class="topbar-btn" title="收藏">☆</button>
+  <button id="randomBtn" class="topbar-btn" title="随机">🎲</button>
+  <button id="settingsBtn" class="topbar-btn" title="设置">⚙️</button>
+</div>
+
+<!-- 中间主体: 对话 + 光球 + 立绘 -->
+<div class="main-view">
+  <div class="chat-area" id="chatArea"></div>
+  <div class="light-particle">
+  </div>
+  <div class="avatar-container">
+    <canvas id="l2dCanvas" style="display:none"></canvas>
+    <!-- 立绘气泡(人物旁边左侧) -->
+    <div class="l2d-bubble" id="l2dBubble"></div>
+  </div>
+</div>
+
+<!-- 底部输入栏 -->
+<div class="bottom-input-area">
+  <input id="input" placeholder="请输入…" onkeydown="if(event.key==='Enter')sendText()">
+  <button onclick="sendText()">发送</button>
+</div>
+
+<!-- 收藏 / 角色切换面板 -->
+<div id="favModal">
+  <div class="fav-panel">
+    <h3>🎭 选择角色</h3>
+    <div id="favList"></div>
+    <button class="settings-btn" style="width:100%;margin-top:10px" onclick="document.getElementById('favModal').classList.remove('show')">关闭</button>
+  </div>
+</div>
+
+<!-- 设置面板 -->
+<div id="settingsModal">
+  <div class="settings-panel">
+    <div class="settings-sidebar">
+      <div class="settings-nav active" data-tab="tokens">🔑 Token 管理</div>
+      <div class="settings-nav" data-tab="personas">🎭 角色管理</div>
+      <div class="settings-nav" data-tab="model">🧠 模型设置</div>
+      <div class="settings-nav" data-tab="appearance">🎨 外观设置</div>
+      <div class="settings-nav" data-tab="about">ℹ️ 关于</div>
+    </div>
+    <div class="settings-content">
+      <div class="settings-tab" id="tab-tokens">
+        <h3>🔑 Token 管理</h3>
+        <div class="settings-row">
+          <label>小米 MiMo Key（对话大脑）</label>
+          <input type="password" id="setDeepseekKey" placeholder="sk-...（留空保持现有）">
+        </div>
+        <div class="settings-row">
+          <label>DashScope Key（CosyVoice 克隆音色）</label>
+          <input type="password" id="setDashscopeKey" placeholder="sk-...（留空保持现有）">
+        </div>
+        <div class="settings-row">
+          <label>DashScope ASR Key（语音识别）</label>
+          <input type="password" id="setDashscopeAsrKey" placeholder="sk-...（留空保持现有）">
+        </div>
+        <div class="settings-row">
+          <label>Tool Key（工具链）</label>
+          <input type="password" id="setToolKey" placeholder="sk-...（留空保持现有）">
+        </div>
+        <div class="settings-row">
+          <label>Vision Key（截图视觉）</label>
+          <input type="password" id="setVisionKey" placeholder="sk-or-...（留空保持现有）">
+        </div>
+        <div class="settings-row">
+          <button class="settings-btn" onclick="saveTokens()">💾 保存 Token</button>
+          <span id="tokenStatus" style="font-size:12px;color:rgba(110,243,176,.8);margin-left:10px"></span>
+        </div>
+      </div>
+      <div class="settings-tab" id="tab-personas" style="display:none">
+        <h3>🎭 角色管理</h3>
+        <div id="personaAdminList" class="persona-grid"></div>
+        <div style="margin-top:14px;border-top:1px solid rgba(200,200,210,.12);padding-top:12px">
+          <h3 style="margin-bottom:8px">➕ 添加 / 编辑角色</h3>
+          <div class="settings-row" style="display:flex;gap:10px">
+            <div style="flex:1"><label>角色 ID（英文）</label><input id="pfRole" placeholder="catgirl"></div>
+            <div style="flex:1"><label>角色名</label><input id="pfName" placeholder="猫娘"></div>
+          </div>
+          <div class="settings-row"><label>一句话描述</label><input id="pfDesc" placeholder="傲娇可爱的猫娘"></div>
+          <div class="settings-row"><label>开场白</label><input id="pfGreeting" placeholder="喵-你终于来啦！"></div>
+          <div class="settings-row"><label>人设（性格 + 说话风格）</label><textarea id="pfSystem" placeholder="你是猫娘，傲娇又粘人…"></textarea></div>
+          <div class="settings-row"><label>❤️ 喜好描述（会并入人设）</label><textarea id="pfLikes" placeholder="喜欢小鱼干、逗猫棒…"></textarea></div>
+          <div class="settings-row">
+            <label>音色</label>
+            <select id="pfVoice">
+              <option value="">默认（晓晓 女声）</option>
+              <option value="edge:zh-CN-XiaoyiNeural">晓伊（御姐成熟）</option>
+              <option value="edge:zh-CN-YunjianNeural">云健（浑厚男声）</option>
+              <option value="edge:zh-CN-YunxiNeural">云希（阳光男声）</option>
+              <option value="edge:zh-CN-XiaoxuanNeural">晓萱（甜美女声）</option>
+              <option value="edge:zh-TW-HsiaoYuNeural">曉雨（台湾腔）</option>
+              <option value="cosyvoice:cosyvoice-v2-zhanganqi-c69cc7aa500a4090a73338aad4ad6349">张安琪（克隆音色）</option>
+              <option value="custom">自定义…</option>
+            </select>
+          </div>
+          <div class="settings-row"><label>自定义音色 ID（格式 edge:xxx 或 cosyvoice:xxx）</label><input id="pfVoiceCustom" placeholder="edge:zh-CN-xxx"></div>
+          <div class="settings-row">
+            <button class="settings-btn" onclick="savePersonaForm()">💾 保存角色</button>
+            <button class="settings-btn" style="margin-left:8px" onclick="clearPersonaForm()">清空表单</button>
+            <span id="personaStatus" style="font-size:12px;color:rgba(110,243,176,.8);margin-left:10px"></span>
+          </div>
+        </div>
+      </div>
+      <div class="settings-tab" id="tab-model" style="display:none">
+        <h3>🧠 模型设置</h3>
+        <p style="color:rgba(220,222,228,.6);font-size:13px;line-height:1.8">当前使用 DeepSeek（deepseek-chat）作为对话模型。<br>可在上方 Token 管理中更换 API Key。<br>模型名称等高级配置请在 config 中调整。</p>
+      </div>
+      <div class="settings-tab" id="tab-appearance" style="display:none">
+        <h3>🎨 外观设置</h3>
+        <p style="color:rgba(220,222,228,.6);font-size:13px;line-height:1.8">粒子效果、主题色等外观选项开发中…</p>
+      </div>
+      <div class="settings-tab" id="tab-about" style="display:none">
+        <h3>ℹ️ 关于</h3>
+        <p style="color:rgba(220,222,228,.6);font-size:13px;line-height:1.8">小暖 AI 女友 · 版本 1.0<br>语音通话 + 多角色 + 工具调用<br>Powered by DeepSeek / CosyVoice / Edge TTS</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/live2d/live2dcubismcore.min.js?v=14"></script>
+<script src="/static/live2d/pixi.min.js?v=14"></script>
+<script src="/static/live2d/pixi-live2d-display.cubism4.min.js?v=14"></script>
+<script src="/static/js/particles.js?v=14"></script>
+<script src="/static/js/main.js?v=14"></script>
+<script src="/static/js/live2d.js?v=14"></script>
+<script src="/static/js/voice.js?v=14"></script>
+<script src="/static/js/personas.js?v=14"></script>
+<script src="/static/js/settings.js?v=14"></script>
+<script src="/static/js/init.js?v=14"></script>
+
+</body>
+</html>
+
+
+

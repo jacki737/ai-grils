@@ -1,0 +1,9 @@
+微信=D:\Tencent\Weixin\Weixin.exe
+网易云音乐=D:\网易云\CloudMusic\cloudmusic.exe
+QQ音乐=D:\QQ音乐\QQMusic.exe
+chrome=C:\Program Files\Google\Chrome\Application\chrome.exe
+Google Chrome=C:\Program Files\Google\Chrome\Application\chrome.exe
+edge=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+Microsoft Edge=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+pycharm=D:\Program Files\JetBrains\PyCharm\bin\pycharm64.exe
+今日头条=C:\Users\marka\Desktop\今日头条.lnk

@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 日志与临时
+logs/
+*.log
+tools.log
+bug_reports.log
+
+# 大模型文件
+models/
+!models/__init__.py
+models/faster-whisper-small/model.bin is 461.15 MB;
+
+# 密钥配置(本地保留, 不入库)
+config.json
+
+# 隐私数据(对话历史)
+histories/
+*.json
+!histories/*.json.example
+
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 临时分析文件
+combo_test_out.txt
+wins.txt
+disasm_*.txt
+app_disasm.txt
+decompile_log.txt
+app_restored.py
+check_db.py
+check_pyc2.py
+scan_pyc.py
+inspect_pyc.py
+try_import.py
+try_uncompyle*.py
+use_xdis*.py
+run_decompile.py
+download_pycdc.py
+test_server.py
+test_all.py
+test_api.py.venv/
+venv/
+env/
+*.pkl
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.safetensors
+*.model
+*.weights
+node_modules/
+dist/
+build/
+*.db
+*.sqlite
+*.sqlite3
+*.tmp
+*.temp
+*.cache
+
+# ����Կ�ı���/�ֶ����Խű�
+config.json.bak*
+tests/manual/
