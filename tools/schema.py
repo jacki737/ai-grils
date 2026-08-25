@@ -340,4 +340,19 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "gen_script",
+            "description": "根据真实环境生成可运行的 Python 脚本。用户说'写个脚本/帮我写个小程序/写个监控/批量处理'等时用这个。会先探测真实环境(系统信息/当前目录/依赖/配置)再生成针对性代码。参数 intent 传用户想写什么脚本的自然语言描述；probes 可选，指定要探测的上下文(默认 system_info,cwd)。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "intent": {"type": "string", "description": "用户想写什么脚本, 如 '写个监控 CPU 内存的守护进程'"},
+                    "probes": {"type": "array", "items": {"type": "string", "enum": ["system_info", "cwd", "requirements", "git_status"]}, "description": "要探测的上下文, 可选 system_info/cwd/requirements/git_status, 默认 ['system_info', 'cwd']"}
+                },
+                "required": ["intent"],
+            },
+        },
+    },
 ]
