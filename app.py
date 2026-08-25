@@ -130,6 +130,13 @@ def _match_clause(seg, prev_app):
                 return ("set_reminder", {"raw": raw})
         except Exception:
             pass
+    # 0.2) 系统信息细分: 只查 cpu/内存/磁盘/电池/开机时长
+    m_sys = re.search(r"(cpu|处理器|内存|磁盘|硬盘|电池|开机时长|开机)", seg, re.I)
+    if m_sys and re.search(r"(查看|查|看|多少|使用率|占用|状态|怎么样|如何)", seg):
+        kw = m_sys.group(1).lower()
+        part = {"cpu": "cpu", "处理器": "cpu", "内存": "内存", "磁盘": "磁盘",
+                "硬盘": "磁盘", "电池": "电池", "开机时长": "开机", "开机": "开机"}.get(kw, "")
+        return ("system_info", {"part": part})
     # 0.3) 天气类: 确定性走 get_weather, 语音播报, 绝不开浏览器
     if "天气" in seg:
         seg2 = re.sub(r"(今天|明天|后天|现在|当前|一下|看看|查看|看下|看|查|帮我|的|怎么样|如何)", "", seg)

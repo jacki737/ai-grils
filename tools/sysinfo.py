@@ -66,10 +66,20 @@ def _wsl_sysinfo():
     return out
 
 
-def system_info():
+_PART_KEYS = {
+    "cpu": ["CPU占用", "CPU"],
+    "内存": ["内存"],
+    "磁盘": ["磁盘"],
+    "电池": ["电池"],
+    "开机": ["开机时长"],
+}
+
+
+def system_info(part: str = ""):
     """查看系统状态: Windows 主机(系统/CPU/内存/磁盘/电池/开机时长) + Linux/WSL(如有)
 
-    返回的每个键都是给模型看的中文描述。
+    part: 只看某一部分(cpu/内存/磁盘/电池/开机), 空则全量。
+    返回的每个键都是给模型看的中文描述; 细分查询时附带 msg 口语播报。
     """
     try:
         w = _win_sysinfo()
@@ -89,6 +99,12 @@ def system_info():
             result.update(_wsl_sysinfo())
         except Exception:
             result["Linux/WSL"] = "探测失败"
+        part = (part or "").strip().lower()
+        if part and part in _PART_KEYS:
+            keys = _PART_KEYS[part]
+            picked = [(k, result.get(k, "未知")) for k in keys]
+            result = {"ok": True, "msg": "，".join(f"{k}{v}" for k, v in picked),
+                      **{k: v for k, v in picked}}
         return result
     except Exception as e:
         return {"ok": False, "error": f"获取系统状态失败: {e}"}
