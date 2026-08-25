@@ -35,7 +35,7 @@ _CN_DIGITS = {
 _NUM = r"(?:\d+|[零一二两三四五六七八九十]{1,3})"
 
 # 时间表达式正则
-_RE_REL = re.compile(rf"^(?:\s*({_NUM})\s*(分钟|小时|秒钟|秒)后)")
+_RE_REL = re.compile(rf"^(?:\s*({_NUM})\s*(分钟|小时|秒钟|秒|天)后)")
 _RE_ABS = re.compile(
     rf"^\s*(?:(今天|明天|后天)\s*)?"
     rf"(?:(早上|上午|中午|下午|晚上)\s*)?"
@@ -145,7 +145,7 @@ def parse_time(text):
             break
     now = datetime.now()
 
-    # 相对时间：X秒钟后 / X分钟后 / X小时后
+    # 相对时间：X秒钟后 / X分钟后 / X小时后 / X天后
     m = _RE_REL.match(text)
     if m and m.end() == len(text):
         n = _cn_to_int(m.group(1))
@@ -156,6 +156,8 @@ def parse_time(text):
             delta = timedelta(minutes=n)
         elif unit == "小时":
             delta = timedelta(hours=n)
+        elif unit == "天":
+            delta = timedelta(days=n)
         else:
             delta = timedelta(seconds=n)
         # 秒级保留秒精度；分钟级截断到分钟

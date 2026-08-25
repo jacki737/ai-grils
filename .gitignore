@@ -1,53 +1,29 @@
-# Python
+# ===== Python =====
 __pycache__/
 *.pyc
 *.pyo
 
-# 日志与临时
+# ===== 日志 =====
 logs/
 *.log
-tools.log
-bug_reports.log
 
-# 大模型文件
+# ===== 模型权重(大文件, 不入库) =====
 models/
-!models/__init__.py
-models/faster-whisper-small/model.bin is 461.15 MB;
 
-# 密钥配置(本地保留, 不入库)
+# ===== 密钥与本地配置 =====
 config.json
+config.json.bak*
+weixin.env
 
-# 隐私数据(对话历史)
+# ===== 运行时数据(隐私) =====
 histories/
-*.json
-!histories/*.json.example
+memory/*.json
+history.json
+*.db
+*.sqlite
+*.sqlite3
 
-
-# 系统
-.DS_Store
-Thumbs.db
-
-# 临时分析文件
-combo_test_out.txt
-wins.txt
-disasm_*.txt
-app_disasm.txt
-decompile_log.txt
-app_restored.py
-check_db.py
-check_pyc2.py
-scan_pyc.py
-inspect_pyc.py
-try_import.py
-try_uncompyle*.py
-use_xdis*.py
-run_decompile.py
-download_pycdc.py
-test_server.py
-test_all.py
-test_api.py.venv/
-venv/
-env/
+# ===== 二进制/临时 =====
 *.pkl
 *.pt
 *.pth
@@ -55,18 +31,46 @@ env/
 *.onnx
 *.gguf
 *.safetensors
-*.model
-*.weights
-node_modules/
-dist/
-build/
-*.db
-*.sqlite
-*.sqlite3
 *.tmp
 *.temp
 *.cache
 
-# ����Կ�ı���/�ֶ����Խű�
-config.json.bak*
+# ===== 系统/IDE =====
+.DS_Store
+Thumbs.db
+.idea/
+
+# ===== 反编译/调试残留 =====
+disasm_*.txt
+app_disasm.txt
+app_restored.py
+decompile_log.txt
+check_*.py
+check_inline.js
+scan_pyc.py
+inspect_pyc.py
+try_*.py
+use_xdis*.py
+run_decompile.py
+download_pycdc.py
+verify.py
+combo_test_out.txt
+wins.txt
+list_wins.py
+
+# ===== 旧测试(已被 tests/ 取代) =====
+test_server.py
+test_all.py
+test_api.py
+test_speak.py
+
+# ===== 其他 =====
+node_modules/
+dist/
+build/
+venv/
+.venv/
+env/
 tests/manual/
+
+!weixin.env.example
