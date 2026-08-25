@@ -130,6 +130,12 @@ def _match_clause(seg, prev_app):
                 return ("set_reminder", {"raw": raw})
         except Exception:
             pass
+    # 0.3) 天气类: 确定性走 get_weather, 语音播报, 绝不开浏览器
+    if "天气" in seg:
+        seg2 = re.sub(r"(今天|明天|后天|现在|当前|一下|看看|查看|看下|看|查|帮我|的|怎么样|如何)", "", seg)
+        m_city = re.search(r"([\u4e00-\u9fa5]{2,4})天气", seg2)
+        city = m_city.group(1) if m_city else ""
+        return ("get_weather", {"city": city or "北京"})
     # 0.4) 截图保存类: "保存当前屏幕保存到E盘" -> screenshot(save_to=盘符路径)
     if re.search(r"(屏幕|截图|截屏|拍屏|桌面)", seg) and "保存" in seg:
         m_d = re.search(r"([A-Za-z])\s*盘", seg)
