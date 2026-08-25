@@ -130,6 +130,12 @@ def _match_clause(seg, prev_app):
                 return ("set_reminder", {"raw": raw})
         except Exception:
             pass
+    # 0.4) 截图保存类: "保存当前屏幕保存到E盘" -> screenshot(save_to=盘符路径)
+    if re.search(r"(屏幕|截图|截屏|拍屏|桌面)", seg) and "保存" in seg:
+        m_d = re.search(r"([A-Za-z])\s*盘", seg)
+        drive = (m_d.group(1).upper() if m_d else "E")
+        path = f"{drive}:\\截图_{time.strftime('%Y%m%d_%H%M%S')}.png"
+        return ("screenshot", {"save_to": path})
     # 0.5) 看屏幕类: 确定性走 截图+视觉模型描述, 绝不让 LLM 拿去开浏览器搜
     if re.search(r"(屏幕|桌面)", seg) and re.search(r"(看看|看一下|查看|瞧|瞅|截屏|截图|有什么|啥|显示)", seg):
         return ("screen_view", {})
@@ -229,6 +235,9 @@ def _run_combo(task_id, role, steps, user_text):
                 results.append({"step": name, "result": r})
                 continue
             r = exec_tool(name, args)
+            if name == "screenshot" and args.get("save_to"):
+                if isinstance(r, dict) and r.get("ok"):
+                    r = {"msg": f"截好啦，已保存到 {r.get('saved_to') or args['save_to']}～"}
             results.append({"step": name, "result": r})
             if name == "open_app":
                 time.sleep(1.5)  # 等窗口起来拿焦点, 后续打字/操作才有目标

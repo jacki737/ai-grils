@@ -104,7 +104,7 @@ def call_llm(messages, tools=None):
                 _eb = ""
             print(f"[LLM] HTTP {e.code} from {api_url}: {_eb}")
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                time.sleep(2 + attempt * 3)
+                time.sleep(8 + attempt * 12 if e.code == 429 else 2 + attempt * 3)
                 continue
         except Exception as e:
             last_err = e
@@ -134,5 +134,7 @@ def call_llm(messages, tools=None):
                 api_url = old_url
 
     if msg is None:
+        if isinstance(last_err, urllib.error.HTTPError) and last_err.code == 429:
+            return {"role": "assistant", "content": "（API 被限流啦，我喘口气，你半分钟后再叫我～）"}
         return {"role": "assistant", "content": f"（一时语塞：{last_err}）"}
     return msg
