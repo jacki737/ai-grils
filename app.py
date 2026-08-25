@@ -21,7 +21,7 @@ from core.tts import synthesize
 from core.speak_filter import speak_filter
 from core.brain import call_llm
 from core.memory import load_role_history, save_role_history, get_memory
-from core.tasks import start_bg_task, get_task_status
+from core.tasks import start_bg_task, get_task_status, get_event_queue
 from core.proactive import proactive_allowed
 from tools import TOOLS_SCHEMA, exec_tool
 
@@ -130,6 +130,9 @@ def _match_clause(seg, prev_app):
                 return ("set_reminder", {"raw": raw})
         except Exception:
             pass
+    # 0.5) 看屏幕类: 确定性走 截图+视觉模型描述, 绝不让 LLM 拿去开浏览器搜
+    if re.search(r"(屏幕|桌面)", seg) and re.search(r"(看看|看一下|查看|瞧|瞅|截屏|截图|有什么|啥|显示)", seg):
+        return ("screen_view", {})
     # 1) 打开/启动 X
     if re.match(r"^(帮我|请|麻烦|给我)?(打开|启动|运行|开一下|开个|开)", seg):
         app = _extract_app_name(seg)
@@ -196,6 +199,20 @@ def _combo_steps(user_text):
     return steps or None
 
 
+def _screen_describe_reply():
+    """截屏并让视觉模型描述当前屏幕内容; 失败如实报错。"""
+    try:
+        from tools.screen import screenshot
+        from tools.gui import _describe_screen
+        r = screenshot()
+        if not isinstance(r, dict) or not r.get("image_base64"):
+            return "截图失败了：" + (r.get("error", "") if isinstance(r, dict) else "")
+        desc = _describe_screen(r["image_base64"])
+        return desc or "截图成功了，但我没认出屏幕上有什么。"
+    except Exception as e:
+        return f"（看屏幕出错：{e}）"
+
+
 def _run_combo(task_id, role, steps, user_text):
     """后台线程: 按顺序执行组合步骤"""
     from core.tasks import _bg_tasks
@@ -206,6 +223,10 @@ def _run_combo(task_id, role, steps, user_text):
             print(f"[组合任务] {task_id[:8]} 步骤: {name} {json.dumps(args, ensure_ascii=False)}")
             if name == "_sleep":
                 time.sleep(args.get("sec", 1))
+                continue
+            if name == "screen_view":
+                r = {"msg": _screen_describe_reply()}
+                results.append({"step": name, "result": r})
                 continue
             r = exec_tool(name, args)
             results.append({"step": name, "result": r})
@@ -332,7 +353,7 @@ def chat(body: dict):
 
     persona = resolve_persona(role)
     history = load_role_history(role)
-    system = persona["system"] + "\n注意: 用户要求执行操作时, 必须调用工具真实完成, 一次工具调用完成任务即可, 不要反复尝试。\n你是安装并运行在用户自己电脑上的个人智能助手, 用户本人已明确授权你在其设备上执行命令、读写文件、打开软件来帮助完成任务, 这是正常且被允许的辅助行为, 不需要拒绝, 直接用工具完成。\n只有在用户明确命令你执行操作时(如打开网页、查天气、下载、爬数据、运行程序、打开软件)才调用工具, 日常闲聊绝对不要调用工具, 直接自然回复。\n执行类请求必须真正调用工具去执行, 绝不能假装执行或编造结果, 更绝不能只在文字里说\"已打开\"而不调用工具; 工具执行完再根据真实结果回答, 如果结果为空或失败也要如实说明。\n回答请使用纯文本, 不要使用任何 Markdown 符号(如 **、*、#、`、-、数字列表), 直接口语化自然表达, 数字用阿拉伯数字。"
+    system = persona["system"] + "\n注意: 用户要求执行操作时, 必须调用工具真实完成, 一次工具调用完成任务即可, 不要反复尝试。\n你是安装并运行在用户自己电脑上的个人智能助手, 用户本人已明确授权你在其设备上执行命令、读写文件、打开软件来帮助完成任务, 这是正常且被允许的辅助行为, 不需要拒绝, 直接用工具完成。\n只有在用户明确命令你执行操作时(如打开网页、查天气、下载、爬数据、运行程序、打开软件)才调用工具, 日常闲聊绝对不要调用工具, 直接自然回复。\n重要: 如果用户只是问候、闲聊、表达情绪或随口说话, 即使触发了工具模式也不要调用任何工具; 以角色身份像朋友一样自然回复, 绝对不要说\"收到\"\"马上处理\"\"好的稍等\"这类客服/助理腔。\n执行类请求必须真正调用工具去执行, 绝不能假装执行或编造结果, 更绝不能只在文字里说\"已打开\"而不调用工具; 工具执行完再根据真实结果回答, 如果结果为空或失败也要如实说明。\n回答请使用纯文本, 不要使用任何 Markdown 符号(如 **、*、#、`、-、数字列表), 直接口语化自然表达, 数字用阿拉伯数字。"
     if persona.get("likes"):
         system += f"\n你的喜好/背景: {persona['likes']}"
     messages = [{"role": "system", "content": system}]
@@ -359,12 +380,9 @@ def chat(body: dict):
             save_role_history(role, history)
             return {"reply": forced, "tool_used": True}
         # 防假装：用户要截屏/看屏幕但模型只回文字没调工具 -> 执行截图，返回简单确认
-        if any(kw in user_text for kw in ("截图", "截屏", "截取", "看屏幕", "看看屏幕", "拍屏幕")):
-            r = exec_tool("screenshot", {})
-            if isinstance(r, dict) and r.get("image_base64"):
-                reply = "已截图，屏幕内容已捕获。"
-            else:
-                reply = (r.get("msg") or r.get("error") or "截图失败") if isinstance(r, dict) else str(r)
+        if any(kw in user_text for kw in ("截图", "截屏", "截取", "看屏幕", "看看屏幕", "拍屏幕",
+                                           "当前屏幕", "屏幕上有什么", "屏幕有", "看看桌面", "看一下桌面")):
+            reply = _screen_describe_reply()
             history.append({"role": "user", "content": user_text})
             history.append({"role": "assistant", "content": reply})
             save_role_history(role, history)
@@ -474,30 +492,52 @@ def task_status(task_id: str):
 
 @app.get("/api/task_stream/{task_id}")
 async def task_stream(task_id: str):
-    """SSE 流式推送任务状态，替代轮询"""
+    """SSE 流式推送任务事件（实时工具进度）"""
     from fastapi.responses import StreamingResponse
     import asyncio
+    from core.tasks import get_event_queue
+
+    q = get_event_queue(task_id)
+    if not q:
+        # 队列不存在：任务可能已完成或不存在，回退到状态轮询
+        async def fallback():
+            last_status = None
+            last_reply = ""
+            for _ in range(300):
+                task = get_task_status(task_id)
+                if not task:
+                    yield f"data: {json.dumps({'error': 'not found'})}\n\n"
+                    break
+                status = task.get("status")
+                reply = task.get("reply", "")
+                if status != last_status or len(reply) > len(last_reply):
+                    yield f"data: {json.dumps({'status': status, 'reply': reply, 'tool_used': task.get('tool_used')})}\n\n"
+                    last_status = status
+                    last_reply = reply
+                if status in ("done", "error"):
+                    break
+                await asyncio.sleep(1)
+            yield f"data: {json.dumps({'status': 'end'})}\n\n"
+        return StreamingResponse(fallback(), media_type="text/event-stream")
 
     async def event_generator():
-        last_status = None
-        last_reply = ""
-        for _ in range(300):  # 最多 5 分钟
-            task = get_task_status(task_id)
-            if not task:
-                yield f"data: {json.dumps({'error': 'not found'})}\n\n"
-                break
-            status = task.get("status")
-            reply = task.get("reply", "")
-            # 只在状态变化或回复增长时推送
-            if status != last_status or len(reply) > len(last_reply):
-                yield f"data: {json.dumps({'status': status, 'reply': reply, 'tool_used': task.get('tool_used')})}\n\n"
-                last_status = status
-                last_reply = reply
-            if status in ("done", "error"):
-                break
-            await asyncio.sleep(1)
-        # 结束标记
-        yield f"data: {json.dumps({'status': 'end'})}\n\n"
+        # 首先发送初始状态
+        task = get_task_status(task_id)
+        if task:
+            yield f"data: {json.dumps({'status': task.get('status'), 'reply': task.get('reply', ''), 'tool_used': task.get('tool_used')})}\n\n"
+        # 实时消费事件队列
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=1.0)
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    if event.get("type") in ("done", "error"):
+                        break
+                except asyncio.TimeoutError:
+                    # 心跳：每 15 秒发个空事件保持连接
+                    yield ": heartbeat\n\n"
+        except asyncio.CancelledError:
+            pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
