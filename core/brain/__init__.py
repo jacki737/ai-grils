@@ -10,8 +10,8 @@ from core.persona import PERSONAS_DB
 # ===== URL/模型名硬编码 =====
 URL_CHAT = "https://api.xiaomimimo.com/v1"
 MODEL_CHAT = "mimo-v2.5"
-URL_TOOL = "https://api.deepseek.com/v1"
-MODEL_TOOL = "deepseek-chat"
+URL_TOOL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+MODEL_TOOL = "qwen3.7-plus"
 URL_VISION = "https://openrouter.ai/api/v1"
 MODEL_VISION = "google/gemma-4-31b-it:free"
 URL_ZHIPU = "https://open.bigmodel.cn/api/paas/v4"
