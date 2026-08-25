@@ -251,7 +251,14 @@ def _run_combo(task_id, role, steps, user_text):
         for item in results:
             r = item["result"]
             if isinstance(r, dict):
-                ok_parts.append(r.get("msg") or r.get("error") or "")
+                part = r.get("msg") or r.get("error")
+                if not part and r.get("ok") is not False:
+                    # 工具没给 msg(如 system_info): 把中文键值拼成口语播报
+                    kvs = [f"{k}{v}" for k, v in r.items()
+                           if k != "ok" and isinstance(v, (str, int, float)) and str(v).strip()]
+                    part = "，".join(kvs)
+                if part:
+                    ok_parts.append(part)
         reply = "；".join(p for p in ok_parts if p) or "做完了～"
     except Exception as e:
         print(f"[组合任务] {task_id[:8]} 异常: {e}")
