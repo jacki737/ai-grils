@@ -11,11 +11,12 @@ from pathlib import Path
 from logsetup import setup_logging
 setup_logging()
 
+import fastapi
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from core.persona import resolve_persona, load_personas, get_role_voice, PERSONAS
+from core.persona import resolve_persona, load_personas, get_role_voice, PERSONAS, BUILTIN_PERSONAS, save_persona as core_save_persona, delete_persona as core_delete_persona
 from core.stt import transcribe
 from core.tts import synthesize
 from core.speak_filter import speak_filter
@@ -167,6 +168,16 @@ def _match_clause(seg, prev_app):
     # 3) 播放音乐(无具体歌名): 播放/放歌/随机播放/来点音乐
     if re.match(r"^(帮我|请)?(随机)?(播放?音乐|放(?:一?首)?歌|来点?(?:音乐|歌)|听歌|放首歌)$", seg):
         return ("play_music", {})
+    # 1.5) 在X(里)写/输入Y: 展开成 打开X + 打字 两步
+    m = re.match(r"^在([\u4e00-\u9fa5]{2,6})(?:里|中|内)?(?:写|输入|打字|打上|打)(.+)$", seg)
+    if m:
+        app_name = m.group(1)
+        text = m.group(2).strip()
+        if text:
+            if prev_app and prev_app == app_name:
+                return ("mouse_action", {"action": "type", "text": text})
+            return [("open_app", {"name": app_name}),
+                    ("mouse_action", {"action": "type", "text": text})]
     # 4) 写/输入 X: 仅当前面刚打开过应用时才当"打字"(如 打开记事本写hello);
     #    否则是创作请求(写故事/写诗), 返回 None 交给 LLM 聊天
     m = re.match(r"^(?:帮我)?(?:写|输入|打上)(?:上|入|下)?\s*[\u201c\"'「『]?(.{1,200}?)[\u201d\"'」』]?$", seg)
@@ -174,6 +185,10 @@ def _match_clause(seg, prev_app):
         content = m.group(1).strip()
         if content:
             return ("mouse_action", {"action": "type", "text": content})
+    # 保存/另存为: Ctrl+S / Ctrl+Shift+S
+    if re.match(r"^(?:保存(?:为|另存为)?|另存为)$", seg):
+        key = "ctrl+shift+s" if "另存" in seg or "存为" in seg else "ctrl+s"
+        return ("mouse_action", {"action": "key", "text": key})
     # 5) 截图/截屏
     if re.search(r"截图|截屏|拍屏", seg):
         return ("screenshot", {})
@@ -212,9 +227,15 @@ def _combo_steps(user_text):
         hit = _match_clause(seg, prev_app)
         if hit is None:
             return None  # 有子句不认识 -> 整体交给 LLM
-        steps.append(hit)
-        if hit[0] == "open_app":
-            prev_app = hit[1].get("name")
+        if isinstance(hit, list):
+            steps.extend(hit)
+            for h in hit:
+                if h[0] == "open_app":
+                    prev_app = h[1].get("name")
+        else:
+            steps.append(hit)
+            if hit[0] == "open_app":
+                prev_app = hit[1].get("name")
     return steps or None
 
 
@@ -278,34 +299,6 @@ def _run_combo(task_id, role, steps, user_text):
     except Exception:
         pass
     _bg_tasks[task_id] = {"status": "done", "reply": reply, "tool_used": True, "_finished_at": time.time()}
-
-
-@app.get("/api/personas")
-def list_personas():
-    return [{"id": k, "name": v["name"], "desc": v["desc"]} for k, v in PERSONAS.items()]
-
-
-@app.get("/api/persona")
-def get_persona(role: str = "jarvis"):
-    p = resolve_persona(role)
-    return {"role": role, **p}
-
-
-@app.post("/api/persona")
-def create_persona(data: dict):
-    role = data.get("role", "").strip()
-    if not role:
-        return JSONResponse({"error": "role required"}, status_code=400)
-    from core.persona import save_persona
-    save_persona(role, data.get("name", role), data.get("desc", ""), data.get("greeting", ""), data.get("system", ""), data.get("voice", ""), data.get("likes", ""))
-    return {"ok": True}
-
-
-@app.delete("/api/persona")
-def delete_persona(role: str):
-    from core.persona import delete_persona
-    delete_persona(role)
-    return {"ok": True}
 
 
 @app.get("/api/settings")
@@ -416,11 +409,12 @@ def chat(body: dict):
             history.append({"role": "assistant", "content": reply})
             save_role_history(role, history)
             return {"reply": reply, "tool_used": True}
-        m_song = re.search(r"(?:放|播放|点|听|来首|来点)\s*(?:([\u4e00-\u9fa5]{2,6})的)?\s*([\u4e00-\u9fa5]{1,10})", user_text)
-        if m_song and any(user_text.startswith(p) or p in user_text for p in ("放", "播放", "点", "听", "来首", "来点")):
+        m_song = re.match(r"^(?:帮我)?(?:放|播放|点|听|来首|来点)\s*(?:([\u4e00-\u9fa5]{2,6})的)?\s*([\u4e00-\u9fa5]{1,10})", user_text)
+        if m_song and user_text.startswith(("放", "播放", "点", "听", "来首", "来点", "帮我放", "帮我播放")):
             song = (m_song.group(2) or "").strip()
             artist = (m_song.group(1) or "").strip()
-            if song and song not in ("歌", "首歌", "音乐", "曲", "点歌", "随机", "一首", "首"):
+            if song and song not in ("歌", "首歌", "音乐", "曲", "点歌", "随机", "一首", "首",
+                                     "了", "的", "吗", "呢", "吧", "开", "个", "什么", "几点"):
                 r = exec_tool("play_specific_song", {"query": f"{artist} {song}".strip()})
                 reply = (r.get("msg") or r.get("error") or "") if isinstance(r, dict) else str(r)
                 history.append({"role": "user", "content": user_text})
@@ -667,6 +661,55 @@ threading.Thread(target=_proactive_loop, daemon=True).start()
 
 from fastapi import Response
 import uuid
+
+# ===== Persona CRUD API =====
+def _refresh_personas():
+    global PERSONAS
+    PERSONAS = load_personas()
+    return PERSONAS
+
+def _persona_dict(pid, p):
+    return {"id": pid, "name": p.get("name", ""), "desc": p.get("desc", ""),
+            "system": p.get("system", ""), "greeting": p.get("greeting", ""),
+            "voice": p.get("voice", ""), "likes": p.get("likes", "")}
+
+@app.get("/api/personas")
+def list_personas():
+    return [_persona_dict(k, v) for k, v in _refresh_personas().items()]
+
+@app.get("/api/persona/{pid}")
+def get_persona(pid: str):
+    p = _refresh_personas().get(pid)
+    if p is None:
+        return JSONResponse({"error": "人设不存在"}, status_code=404)
+    return _persona_dict(pid, p)
+
+@app.post("/api/persona")
+async def switch_persona(data: dict = fastapi.Body(...)):
+    role = data.get("role", "").strip()
+    if role not in _refresh_personas():
+        return JSONResponse({"error": "人设不存在"}, status_code=404)
+    return {"ok": True, "role": role, "name": PERSONAS[role]["name"]}
+
+@app.post("/api/persona/save")
+async def save_persona(data: dict = fastapi.Body(...)):
+    pid = data.get("id", "").strip()
+    if not pid:
+        return JSONResponse({"error": "id 必填"}, status_code=400)
+    core_save_persona(pid, data.get("name", pid), data.get("desc", ""),
+                      data.get("greeting", ""), data.get("system", ""),
+                      data.get("voice", ""), data.get("likes", ""))
+    _refresh_personas()
+    return {"ok": True}
+
+@app.delete("/api/persona/{pid}")
+def delete_persona(pid: str):
+    if pid in BUILTIN_PERSONAS:
+        return JSONResponse({"error": "内置人设不可删除"}, status_code=400)
+    core_delete_persona(pid)
+    _refresh_personas()
+    return {"ok": True}
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -14,6 +14,17 @@ def load_config():
         return {}
 
 
+def _detect_audio_format(audio_bytes: bytes) -> str:
+    """从字节头识别音频格式 (RIFF=wav, 1A45DFA3=webm, ID3/MPEG=mp3)"""
+    if audio_bytes[:4] == b"RIFF":
+        return "wav"
+    if audio_bytes[:4] == b"\x1a\x45\xdf\xa3":
+        return "webm"
+    if audio_bytes[:3] == b"ID3" or audio_bytes[:2] == b"\xff\xfb" or audio_bytes[:2] == b"\xff\xf3":
+        return "mp3"
+    return "wav"
+
+
 async def _dashscope_asr_transcribe(audio_bytes: bytes) -> str:
     """阿里 DashScope ASR (qwen3-asr-flash 兼容模式, 同步 HTTP, 支持 webm/wav/mp3)"""
     cfg = load_config()
@@ -21,15 +32,16 @@ async def _dashscope_asr_transcribe(audio_bytes: bytes) -> str:
     if not key:
         raise RuntimeError("DashScope ASR key 未配置")
     b64 = base64.b64encode(audio_bytes).decode()
+    fmt = _detect_audio_format(audio_bytes)
     # DashScope 兼容模式需要 data URI 格式
-    data_uri = f"data:audio/webm;base64,{b64}"
+    data_uri = f"data:audio/{fmt};base64,{b64}"
     url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     body = {
         "model": "qwen3-asr-flash",
         "messages": [{
             "role": "user",
             "content": [
-                {"type": "input_audio", "input_audio": {"data": data_uri, "format": "webm"}},
+                {"type": "input_audio", "input_audio": {"data": data_uri, "format": fmt}},
             ],
         }],
     }
@@ -55,7 +67,8 @@ async def _mimo_asr_transcribe(audio_bytes: bytes) -> str:
         f"{base}/v1/audio/transcriptions",
     ]
     b64 = base64.b64encode(audio_bytes).decode()
-    body = {"model": "mimo-asr", "audio": f"data:audio/wav;base64,{b64}"}
+    fmt = _detect_audio_format(audio_bytes)
+    body = {"model": "mimo-asr", "audio": f"data:audio/{fmt};base64,{b64}"}
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
     async with aiohttp.ClientSession() as session:
         for url in urls:

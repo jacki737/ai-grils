@@ -88,7 +88,7 @@ async function renderPersonaAdmin() {
 
 async function editPersona(role) {
   try {
-    const res = await fetch('/api/persona?role=' + encodeURIComponent(role));
+    const res = await fetch('/api/persona/' + encodeURIComponent(role));
     const d = await res.json();
     document.getElementById('pfRole').value = role;
     document.getElementById('pfName').value = d.name;
@@ -124,12 +124,12 @@ async function savePersonaForm() {
   let voice = document.getElementById('pfVoice').value;
   if (voice === 'custom') voice = g('pfVoiceCustom');
   const body = {
-    role, name,
+    id: role, name,
     desc: g('pfDesc'), greeting: g('pfGreeting'),
     system: g('pfSystem'), likes: g('pfLikes'), voice,
   };
   try {
-    const res = await fetch('/api/personas', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+    const res = await fetch('/api/persona/save', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
     const d = await res.json();
     document.getElementById('personaStatus').textContent = d.ok ? `✅ 已保存: ${d.name}` : '保存失败';
     await renderPersonaAdmin();
@@ -140,7 +140,7 @@ async function savePersonaForm() {
 async function deletePersona(role) {
   if (!confirm(`确定删除角色 ${role} 吗？`)) return;
   try {
-    const res = await fetch('/api/personas/' + encodeURIComponent(role), { method: 'DELETE' });
+    const res = await fetch('/api/persona/' + encodeURIComponent(role), { method: 'DELETE' });
     const d = await res.json();
     document.getElementById('personaStatus').textContent = d.ok ? `🗑 已删除 ${role}` : (d.error || '删除失败');
     await renderPersonaAdmin();

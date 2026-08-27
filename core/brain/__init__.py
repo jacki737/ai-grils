@@ -68,7 +68,7 @@ def call_llm(messages, tools=None):
             model = MODEL_TOOL
             key = (cfg.get("tool_key") or "").strip()
             if not key:
-                return {"role": "assistant", "content": "（请先点右上角 ⚙ 设置, 填写 Tool token(DeepSeek), 否则我没法执行操作哦）"}
+                return {"role": "assistant", "content": "（请先点右上角 ⚙ 设置, 填写 Tool token(千问), 否则我没法执行操作哦）"}
     else:
         base = URL_CHAT
         model = MODEL_CHAT

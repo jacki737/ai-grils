@@ -70,21 +70,31 @@ _VLM_FREE_POOL = [
     "nvidia/nemotron-nano-12b-v2-vl:free",
 ]
 
+# 失败模型冷却表: {模型名: 失败时间戳}——10 分钟内不再试, 避免每步都挨个撞死模型
+_VLM_COOLDOWN = {}
+_VLM_COOLDOWN_SEC = 600
+
 
 def _ask_vlm(image_b64, user_text, system=None):
     """配置驱动的视觉模型调用: 免费池逐个轮换(429/404自动换), 最后降级 glm-4v-flash。
 
     通常不直接抛异常——全部失败才往上抛, 由调用方(gui.py)按"视觉暂时不可用"处理。
     """
+    import time as _time
     base, key, model, extra = _vision_config()
     candidates = [model] + [m for m in _VLM_FREE_POOL if m != model]
+    now = _time.time()
+    alive = [m for m in candidates if now - _VLM_COOLDOWN.get(m, 0) > _VLM_COOLDOWN_SEC]
+    if not alive:
+        alive = candidates  # 全在冷却也硬着头皮试一轮主模型, 免得永远卡死
     last_exc = None
-    for m in candidates:
+    for m in alive:
         try:
             return _ask_vlm_once(image_b64, user_text, system, base, key, m, extra)
         except Exception as exc:
             last_exc = exc
-            print(f"[gui] 视觉模型 {m} 失败({exc}), 换下一个")
+            _VLM_COOLDOWN[m] = _time.time()
+            print(f"[gui] 视觉模型 {m} 失败({exc}), 换下一个 (冷却10分钟)")
             continue
     # 免费池全挂 -> 智谱兜底(需 zhipu_key)
     fb_key = _VLM_FALLBACK_KEY

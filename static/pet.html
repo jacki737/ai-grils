@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>pet</title>
+<style>
+  /* 魔法绿背景: 会被 Win32 色键抠成全透明 */
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #00ff00 !important;
+    overflow: hidden;
+  }
+  #petContainer {
+    position: fixed; inset: 0;
+    background: #00ff00;
+  }
+  #l2dCanvas { display: none; }
+  #bubble {
+    position: fixed;
+    top: 8px; left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    background: rgba(255,255,255,0.96);
+    color: #333;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font: 14px/1.5 "Microsoft YaHei", sans-serif;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    display: none;
+    z-index: 10;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div id="petContainer">
+  <canvas id="l2dCanvas"></canvas>
+</div>
+<div id="bubble"></div>
+
+<script src="/static/live2d/live2dcubismcore.min.js"></script>
+<script src="/static/live2d/pixi.min.js"></script>
+<script src="/static/live2d/pixi-live2d-display.cubism4.min.js"></script>
+<script src="/static/js/live2d.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    try { initLive2D(); } catch (e) { console.error('Live2D init fail', e); }
+  });
+
+  // ===== 点击说话: 随机短语 -> 后端聊天 -> 气泡显示 + 口型动画 =====
+  var _bubbleTimer = null;
+  var _phrases = ['你好呀～', '在叫我吗？', '今天过得怎么样？', '嘿嘿，点我干嘛～', '我一直都在哦'];
+
+  function _showBubble(text) {
+    var b = document.getElementById('bubble');
+    b.textContent = text;
+    b.style.display = 'block';
+    if (_bubbleTimer) clearTimeout(_bubbleTimer);
+    _bubbleTimer = setTimeout(function () { b.style.display = 'none'; }, 6000);
+  }
+
+  function _mouthTalk(ms) {
+    if (typeof setMouthOpen !== 'function') return;
+    var t = 0;
+    var iv = setInterval(function () {
+      t += 80;
+      setMouthOpen(Math.abs(Math.sin(t / 160)) * 0.9);
+      if (t >= ms) { clearInterval(iv); setMouthOpen(0); }
+    }, 80);
+  }
+
+  document.body.addEventListener('click', function () {
+    var phrase = _phrases[Math.floor(Math.random() * _phrases.length)];
+    _showBubble(phrase);
+    _mouthTalk(1500);
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: phrase, role: 'jarvis' })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.reply) { _showBubble(d.reply); _mouthTalk(2000); }
+      })
+      .catch(function () {});
+  });
+</script>
+</body>
+</html>

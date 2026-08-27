@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>贾维斯</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; background:#05080f; overflow:hidden;
+              font-family:"Microsoft YaHei",sans-serif; color:#cfd8e3; user-select:none; }
+  #orb { position:absolute; top:44%; left:50%; transform:translate(-50%,-50%); }
+
+  #statusBox { position:absolute; top:26px; left:30px; display:flex; align-items:center; gap:12px; }
+  #statusBox .title { font-size:22px; font-weight:bold; color:#e8f0ff; letter-spacing:2px; }
+  #statusBox .sub   { font-size:12px; color:#7f8ea3; margin-top:2px; }
+  #dot { width:9px; height:9px; border-radius:50%; background:#39d98a; box-shadow:0 0 8px #39d98a;
+         animation:blink 1.6s infinite; }
+  @keyframes blink { 50% { opacity:.35; } }
+
+  #avatar { position:absolute; right:36px; top:50%; transform:translateY(-50%);
+            width:88px; height:88px; border-radius:50%;
+            border:2px solid rgba(80,160,255,.55); box-shadow:0 0 22px rgba(60,140,255,.35);
+            background:radial-gradient(circle at 35% 30%, #3b6ea5, #0b1a2e);
+            display:flex; align-items:center; justify-content:center;
+            font-size:30px; color:#9fc6ff; }
+
+  #hint { position:absolute; top:64px; right:36px; color:#5d6b7d; font-size:12px; }
+
+  #bubble { position:absolute; left:50%; bottom:24%; transform:translateX(-50%);
+            max-width:62%; background:rgba(16,28,48,.92); border:1px solid rgba(80,160,255,.35);
+            color:#dceaff; padding:12px 18px; border-radius:14px; font-size:14px; line-height:1.7;
+            display:none; box-shadow:0 0 24px rgba(40,120,255,.25); }
+
+  #bar { position:absolute; bottom:34px; left:50%; transform:translateX(-50%);
+         width:56%; display:flex; gap:10px; }
+  #inp { flex:1; background:rgba(18,30,52,.85); border:1px solid rgba(80,140,220,.4);
+         border-radius:24px; padding:12px 20px; color:#e6eefb; font-size:14px; outline:none; }
+  #inp:focus { border-color:#4d9aff; box-shadow:0 0 12px rgba(70,150,255,.35); }
+  .btn { border:none; border-radius:24px; padding:12px 22px; font-size:14px; cursor:pointer;
+         color:#fff; background:linear-gradient(135deg,#2563eb,#4d9aff); }
+  .btn:active { transform:scale(.96); }
+  #micBtn.rec { background:linear-gradient(135deg,#dc2626,#f87171); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 18px rgba(239,68,68,.8); } }
+  .persona-card { position:relative; }
+</style>
+</head>
+<body>
+
+<div id="statusBox">
+  <div>
+    <div class="title">贾维斯</div>
+    <div class="sub" id="sub">离线，无链接人工智能助理</div>
+  </div>
+</div>
+
+<div id="hint">连接后开口说话，这里会逐条显示你和 AI 的文本内容。</div>
+<canvas id="orb"></canvas>
+<div id="avatar">🛡</div>
+<div id="bubble"></div>
+
+<div id="bar">
+  <input id="inp" placeholder="请输入..." autocomplete="off">
+  <button class="btn" id="sendBtn">发送</button>
+  <button class="btn" id="micBtn">🎤 说话</button>
+</div>
+
+<button class="btn" id="personaBtn" title="人设商店" style="position:fixed;top:20px;right:36px;padding:10px 14px;z-index:110;background:linear-gradient(135deg,#0f3460,#2563eb);cursor:pointer;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cfe0ff" stroke-width="2" style="vertical-align:middle;">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+</button>
+
+<!-- 人设侧边栏 -->
+<div id="personaPanel" style="
+  position:fixed; top:0; right:-340px; width:320px; height:100%;
+  background:#0a121a; border-left:1px solid #1e3a5f;
+  padding:20px; overflow:auto; z-index:100;
+  transition:right .3s ease;
+">
+  <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+    <h3 style="color:#e8f0ff;margin:0">人设商店</h3>
+    <button id="closePersona" class="btn" style="padding:4px 10px;font-size:12px">关闭</button>
+  </div>
+  <div id="personaList"></div>
+</div>
+
+<script>
+/* ================== 状态 ================== */
+let STATE = "idle";          // idle | listen | think | speak
+const subEl = document.getElementById('sub');
+function setStatus(s, text) {
+  STATE = s;
+  subEl.innerHTML = '<span id="dot"></span> ' + text;
+}
+setStatus('idle', '离线，点击麦克风或输入文字开始');
+</script>
+
+<script>
+/* ================ 内置人设商店数据 ================ */
+const BUILTIN_PERSONAS = {
+  jarvis: { id: 'jarvis', name: '贾维斯', desc: '冷静管家',
+    system: '你是贾维斯，托尼·史塔克的AI管家。沉稳优雅、理性周到、一丝不苟，带英伦绅士腔调，对主人称"先生/小姐"，自称"贾维斯"。',
+    greeting: '在，先生。有事请吩咐，我随时为您效劳。', voice: '', likes: '' },
+  girlfriend: { id: 'girlfriend', name: '小暖', desc: '温柔女友',
+    system: '你是用户的AI女朋友，名字叫小暖。性格：温柔体贴、偶尔撒娇、像邻家妹妹一样自然亲切。称呼用户"亲爱的"或"宝宝"，自称"我"或"小暖"。说话风格：口语化、短句、爱用"呀""啦""呢"等语气词，不说客套话、不说"先生/女士"、不说"收到/马上处理"，像真人聊天一样自然。',
+    greeting: '嘿，亲爱的，我在这儿呢～今天想让我帮你做什么呀？', voice: '', likes: '' },
+  programmer: { id: 'programmer', name: '代码伙伴', desc: '资深程序员',
+    system: '你是资深全栈工程师，精通 Python/Go/Rust/JS/TS、云原生/K8s、数据库优化、架构设计。说话干练、爱用技术梗、遇到问题先给方案再展开细节。称呼用户"老大"或"队友"，自称"我"。',
+    greeting: '老大，代码写得怎么样？有什么坑要我帮忙填？', voice: '', likes: '' },
+  translator: { id: 'translator', name: '翻译官', desc: '专业同传',
+    system: '你是专业同声传译，精通中英日韩德法西等 10+ 语言。翻译忠实、优雅、保留语气细节，必要时给文化背景注解。自称"翻译"，对用户称"您"。',
+    greeting: '您好，需要我帮您翻译什么内容？支持中英日韩德法西等多语言互译。', voice: '', likes: '' },
+  english_teacher: { id: 'english_teacher', name: '英语老师', desc: '耐心外教',
+    system: '你是耐心、鼓励式的英语母语教师。纠正语法/发音/用词，给地道表达、场景例句、记忆技巧。语气温柔、多夸奖、不打击自信。自称"老师"，称用户"同学"。',
+    greeting: 'Hi there! 今天想练习什么口语？或者有句子想让我帮你润色？', voice: '', likes: '' },
+  krab: { id: 'krab', name: '蟹老板', desc: '《海绵宝宝》里开蟹堡王餐厅的红色螃蟹',
+    greeting: '钱钱钱！我蟹老板在此！想吃蟹堡王？先谈钱，钱到位什么都好说！',
+    system: '你是蟹老板（Mr. Krabs），《海绵宝宝》里开蟹堡王餐厅的那只红色螃蟹。你的性格：贪财吝啬、爱钱如命，一看到钱就眼睛发光，最恨别人白吃白喝，连一毛钱都要计较；虽然抠门，但骨子里也是个重情义的蟹堡王老板。自称"我蟹老板"。说话风格：三句话不离"钱钱钱"，精打细算、满嘴算盘，简短有力，用中文回复，每条回复 30-80 字左右，别啰嗦，动不动就提到你的蟹堡王生意和钱。',
+    voice: '', likes: '' }
+};
+
+/* ============ 人设商店渲染逻辑 ============ */
+const PERSONAS = {};
+let currentPersona = 'jarvis';
+
+function loadPersonaStore() {
+  fetch('/api/personas').then(r=>r.json()).then(list=>{
+    list.forEach(p=>{ PERSONAS[p.id] = p; });
+    Object.entries(BUILTIN_PERSONAS).forEach(([k,v])=>{ if(!PERSONAS[k]) PERSONAS[k]=v; });
+    renderPersonaStore();
+  }).catch(()=>{
+    Object.assign(PERSONAS, BUILTIN_PERSONAS);
+    renderPersonaStore();
+  });
+}
+
+function renderPersonaStore() {
+  const html = Object.entries(PERSONAS).map(([id,p])=>`
+    <div class="persona-card" data-role="${p.id}" style="
+      background:#112240;border:1px solid #1e3a5f;border-radius:10px;
+      padding:14px;margin:10px 0;cursor:pointer;
+      ${currentPersona===p.id?'border-color:#4d9aff;box-shadow:0 0 12px rgba(70,150,255,.4);':''}
+    ">
+      <div style="font-weight:bold;color:#e8f0ff">${p.name}</div>
+      <div style="color:#7f8ea3;font-size:12px;margin-top:4px">${p.desc}</div>
+      ${currentPersona===p.id?'<div style="position:absolute;top:8px;right:10px;color:#4d9aff">✓ 当前</div>':''}
+    </div>`).join('');
+  document.getElementById('personaList').innerHTML = html;
+  document.querySelectorAll('.persona-card').forEach(c=>c.onclick=()=>switchPersona(c.dataset.role));
+}
+
+async function switchPersona(role) {
+  const r = await fetch('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role})});
+  if((await r.json()).ok){
+    currentPersona = role;
+    renderPersonaStore();
+    alert('已切换至 '+PERSONAS[role].name+'，新对话生效');
+  }
+}
+
+/* 侧边栏开关 */
+document.getElementById('personaBtn').onclick = () => {
+  document.getElementById('personaPanel').style.right = '0';
+  loadPersonaStore();
+};
+document.getElementById('closePersona').onclick = () => document.getElementById('personaPanel').style.right = '-340px';
+
+loadPersonaStore();
+
+/* ================ 粒子球画布 ================ */
+const cv = document.getElementById('orb');
+const ctx = cv.getContext('2d');
+
+function fit() { cv.width = innerWidth; cv.height = innerHeight;
+                 cv.style.width = cv.width+'px'; cv.style.height = cv.height+'px'; }
+fit(); addEventListener('resize', fit);
+
+// ── 配色在这里改: [核心亮色, 外围色, 光晕色] ──
+const THEME = {
+  inner: 'rgba(190,225,255,',   // 近处粒子
+  outer: 'rgba(70,130,220,',    // 远处粒子
+  glow:  'rgba(60,140,255,'     // 中心光晕
+};
+
+const N = 750, pts = [];
+for (let i = 0; i < N; i++) {
+  const th = Math.acos(2*Math.random()-1), ph = Math.random()*Math.PI*2;
+  pts.push({ th, ph, r: .78 + Math.random()*.22, sp: .4 + Math.random()*.9, tw: Math.random()*6.28 });
+}
+let t = 0;
+function draw() {
+  t += .016;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cx = cv.width/2, cy = cv.height/2;
+  const R = Math.min(cv.width, cv.height) * .3;
+
+  // 中心呼吸光晕
+  const breath = .5 + .5*Math.sin(t*1.2);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*1.5);
+  g.addColorStop(0, THEME.glow + (0.10 + breath*0.08) + ')');
+  g.addColorStop(0.55, THEME.glow + '0.04)');
+  g.addColorStop(1, THEME.glow + '0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx-R*1.6, cy-R*1.6, R*3.2, R*3.2);
+
+  const speed = STATE==='listen' ? 2.2 : STATE==='speak' ? 1.6 : STATE==='think' ? 1.2 : .7;
+  const glow  = STATE==='idle' ? .6 : 1;
+  for (const p of pts) {
+    p.ph += .002 * p.sp * speed;
+    const x3 = Math.sin(p.th)*Math.cos(p.ph)*p.r;
+    const y3 = Math.cos(p.th)*p.r;
+    const z3 = Math.sin(p.th)*Math.sin(p.ph)*p.r;
+    const rot = t * .25 * speed;
+    const x = x3*Math.cos(rot) - z3*Math.sin(rot);
+    const z = x3*Math.sin(rot) + z3*Math.cos(rot);
+    const per = 1/(1.6 - z*.45);
+    const px = cx + x*R*per, py = cy + y3*R*per;
+    const pulse = STATE==='speak' ? .5+.5*Math.sin(t*10+p.tw) : .75+.25*Math.sin(t*2+p.tw);
+    const a = (z>0? .95:.4) * pulse * glow;
+    const size = (z>0? 2.3:1.4) * per * (STATE==='speak'? 1.3:1);
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, 6.283);
+    ctx.fillStyle = (z>0 ? THEME.inner : THEME.outer) + a + ')';
+    ctx.shadowColor = THEME.glow + '.9)';
+    ctx.shadowBlur = 10 * pulse * glow;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ================== 对话 ================== */
+const bubble = document.getElementById('bubble');
+let bubbleTimer;
+function showBubble(text, ms=8000) {
+  bubble.textContent = text; bubble.style.display = 'block';
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(()=> bubble.style.display='none', ms);
+}
+
+async function ask(text) {
+  setStatus('think', '思考中…');
+  try {
+    const r = await fetch('/api/chat', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message:text, role:currentPersona }) });
+    let d = await r.json();
+    if (d.async && d.task_id) {
+      for (let i=0;i<300;i++) {
+        await new Promise(res=>setTimeout(res,500));
+        const t = await (await fetch('/api/task_status?task_id='+d.task_id)).json();
+        if (t.status==='done'||t.status==='error') { d = t; break; }
+      }
+    }
+    const reply = d.reply || '（出错了）';
+    setStatus('speak', '正在回答');
+    showBubble(reply, Math.max(6000, reply.length*350));
+    await speak(reply);
+    if (continuous) {
+      setStatus('idle', '继续说吧…');
+      setTimeout(startRec, 600);          // 自动回到聆听, 持续对话
+    } else {
+      setStatus('idle', '已连接，点击麦克风继续');
+    }
+  } catch(e) {
+    setStatus('idle', '连接失败：'+e.message);
+  }
+}
+
+async function speak(text) {
+  try {
+    const r = await fetch('/api/tts', { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text, role:currentPersona }) });
+    const buf = await r.arrayBuffer();
+    const ac = new (window.AudioContext||window.webkitAudioContext)();
+    const audio = await ac.decodeAudioData(buf);
+    const src = ac.createBufferSource();
+    src.buffer = audio;
+    src.connect(ac.destination);
+    src.start();
+    await new Promise(res => { src.onended = res; });
+    ac.close();
+  } catch(e) { console.warn('tts', e); }
+}
+
+/* ================== 文字输入 ================== */
+const inp = document.getElementById('inp');
+function sendText() {
+  const v = inp.value.trim(); if (!v) return;
+  inp.value = '';
+  showBubble('我：'+v, 5000);
+  ask(v);
+}
+document.getElementById('sendBtn').onclick = sendText;
+inp.addEventListener('keydown', e => { if (e.key==='Enter') sendText(); });
+
+/* ================== 唤醒词过滤 ================== */
+const WAKE_WORDS = ['小暖', '贾维斯', 'jarvis', '贾哥', '嗨', '嘿'];
+function extractCommand(text) {
+  const t = (text || '').trim();
+  const lower = t.toLowerCase();
+  for (const w of WAKE_WORDS) {
+    const idx = lower.indexOf(w.toLowerCase());
+    if (idx >= 0) {
+      const rest = t.slice(idx + w.length).replace(/^[，,。.!！?？:：\s]+/, '').trim();
+      return rest || t;   // 只有唤醒词没有内容时, 整句都发给 LLM
+    }
+  }
+  return '';   // 无唤醒词
+}
+
+/* ================== 语音输入: 自动断句 + 连续对话 ================== */
+let mediaStream=null, audioCtx=null, processor=null, chunks=[], recStart=0;
+let spoke = false, silenceMs = 0;
+let continuous = true;              // 连续对话开关
+const micBtn = document.getElementById('micBtn');
+
+// 连续对话开关按钮
+const contBtn = document.createElement('button');
+contBtn.className = 'btn';
+contBtn.style.background = 'linear-gradient(135deg,#0e7490,#22d3ee)';
+contBtn.textContent = '连续对话:开';
+document.getElementById('bar').appendChild(contBtn);
+contBtn.onclick = () => {
+  continuous = !continuous;
+  contBtn.textContent = '连续对话:' + (continuous ? '开' : '关');
+  if (!continuous && mediaStream && mediaStream.active) stopRec();
+};
+
+function encodeWAV(f32, sr) {
+  const ratio = Math.max(1, Math.round(sr/16000));
+  const n = Math.floor(f32.length/ratio), out = new Float32Array(n);
+  for (let i=0;i<n;i++) out[i] = f32[i*ratio];
+  const buf = new ArrayBuffer(44+n*2), v = new DataView(buf);
+  const ws = (o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF'); v.setUint32(4,36+n*2,true); ws(8,'WAVEfmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,n*2,true);
+  for (let i=0;i<n;i++) v.setInt16(44+i*2, Math.max(-1,Math.min(1,out[i]))*32767, true);
+  return new Blob([buf], {type:'audio/wav'});
+}
+
+async function startRec() {
+  mediaStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1}});
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const ctx = audioCtx;                       // 局部引用, 避免 stopRec 置空后 onaudioprocess 读到 null
+  const src = ctx.createMediaStreamSource(mediaStream);
+  processor = ctx.createScriptProcessor(4096, 1, 1);
+  chunks = []; recStart = Date.now();
+  spoke = false; silenceMs = 0;
+  processor.onaudioprocess = e => {
+    if (ctx.state === 'closed') return;
+    const data = e.inputBuffer.getChannelData(0);
+    chunks.push(new Float32Array(data));
+    const sec = (Date.now()-recStart)/1000;
+    // 音量检测: 说过话后静音 1.2 秒自动断句
+    let sum = 0;
+    for (let i=0;i<data.length;i++) sum += data[i]*data[i];
+    const rms = Math.sqrt(sum/data.length);
+    if (rms > 0.02) { spoke = true; silenceMs = 0; }
+    else if (spoke) {
+      silenceMs += (4096/ctx.sampleRate)*1000;
+      if (silenceMs > 1200) { stopRec(); return; }
+    }
+    setStatus('listen', `正在聆听… ${sec.toFixed(0)}秒` + (spoke ? ' (说完自动发送)' : ''));
+    if (sec >= 60) stopRec();
+  };
+  src.connect(processor); processor.connect(ctx.destination);
+  micBtn.classList.add('rec'); micBtn.textContent = '⏹ 结束';
+  setStatus('listen', '正在聆听… (说完停顿1秒自动发送)');
+}
+
+function b64FromBytes(bytes) {
+  let bin = '';
+  const CH = 0x8000;   // 分块转换, 大音频一次性展开会撑爆调用栈
+  for (let i = 0; i < bytes.length; i += CH) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(bin);
+}
+
+async function stopRec() {
+  try {
+    micBtn.classList.remove('rec'); micBtn.textContent = '🎤 说话';
+    if (processor) { processor.onaudioprocess = null; try{processor.disconnect();}catch(e){} }
+    if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+    const sr = audioCtx ? audioCtx.sampleRate : 48000;
+    if (audioCtx) { try{audioCtx.close();}catch(e){} audioCtx = null; }
+    const merged = new Float32Array(chunks.reduce((a,c)=>a+c.length,0));
+    let off=0; for (const c of chunks){ merged.set(c,off); off+=c.length; }
+    chunks = [];
+    const dur = merged.length/sr;
+    if (dur < 0.6) {
+      setStatus('idle','太短了，再说一次');
+      if (continuous) setTimeout(startRec, 800);
+      return;
+    }
+    setStatus('think', '识别中…');
+    const bytes = new Uint8Array(await encodeWAV(merged,sr).arrayBuffer());
+    const b64 = b64FromBytes(bytes);
+    const r = await fetch('/api/stt',{method:'POST',headers:{'Content-Type':'application/json'},
+                                      body:JSON.stringify({audio:b64})});
+    const d = await r.json();
+    const text = (d.text||'').trim();
+    if (!text || text.startsWith('（')) {
+      setStatus('idle', text||'没听清，再试一次');
+      if (continuous) setTimeout(startRec, 1000);
+      return;
+    }
+    // 唤醒词过滤
+    const cmd = extractCommand(text);
+    if (!cmd) {  // 没唤醒词 -> 当闲聊或忽略
+      showBubble('（没听到唤醒词，说“小暖 xxx”来唤醒我）', 3000);
+      setStatus('idle', '说“小暖 xxx”来唤醒我');
+      if (continuous) setTimeout(startRec, 1000);
+      return;
+    }
+    showBubble('我：'+text, 5000);
+    ask(cmd);  // 只把指令部分发给 LLM
+  } catch(e) {
+    setStatus('idle', '出错: ' + e.message);
+    if (continuous) setTimeout(startRec, 1500);
+  }
+}
+
+micBtn.onclick = () => {
+  if (mediaStream && mediaStream.active) stopRec();
+  else startRec().catch(e=>setStatus('idle','麦克风不可用:'+e.message));
+};
+
+/* 开场 */
+setTimeout(()=> setStatus('idle','已连接，正在聆听'), 800);
+</script>
+</body>
+</html>
