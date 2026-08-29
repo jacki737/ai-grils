@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小暖服务守护 — 崩溃自动重启"""
+"""贾维斯服务守护 — 崩溃自动重启"""
 import subprocess
 import time
 import os
@@ -24,7 +24,7 @@ def is_running():
 
 def start_server():
     """启动 uvicorn"""
-    print(f"[{time.strftime('%H:%M:%S')}] 启动小暖服务 (端口 {PORT})...")
+    print(f"[{time.strftime('%H:%M:%S')}] 启动贾维斯服务 (端口 {PORT})...")
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", str(PORT)],
         cwd=APP_DIR,

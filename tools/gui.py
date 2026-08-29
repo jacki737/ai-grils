@@ -31,7 +31,7 @@ _GUI_HELPER = os.path.join(STATIC_DIR, "gui_helper.ps1")
 # 注意: glm-4v 这类模型在开放问答里容易"不敢动", 总是回 fail。
 # 因此 prompt 里强制要求: 必须给出具体动作, 只有极少数情况才允许 fail。
 _GUI_SYSTEM = (
-    "你是小暖的屏幕操作大脑。你看着电脑屏幕截图，根据当前任务决定下一步动作。\n"
+    "你是贾维斯的屏幕操作大脑。你看着电脑屏幕截图，根据当前任务决定下一步动作。\n"
     "只返回一个 JSON 对象（不要任何多余文字、不要 markdown 代码块）：\n"
     '{"action": "left_click|double_click|type|key|scroll|wait|done|fail", '
     '"x": 截图坐标X, "y": 截图坐标Y, '
@@ -54,7 +54,7 @@ _GUI_SYSTEM = (
 
 # 复核 prompt: 只看截图实际可见内容回答是非题, 拿不准一律 false
 _GUI_VERIFY_SYSTEM = (
-    "你是小暖的执行复核模块。我会给你一张电脑屏幕截图和一个判断问题，"
+    "你是贾维斯的执行复核模块。我会给你一张电脑屏幕截图和一个判断问题，"
     "你只根据截图中实际可见的内容回答，绝不猜测、绝不脑补。\n"
     "只返回一个 JSON 对象（不要任何多余文字、不要 markdown 代码块）：\n"
     '{"ok": true或false, "reason": "一句话依据"}\n'

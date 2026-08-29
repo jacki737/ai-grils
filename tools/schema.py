@@ -130,7 +130,7 @@ TOOLS_SCHEMA = [
                 "type": "object",
                 "properties": {
                     "text": {"type": "string", "description": "通知正文"},
-                    "title": {"type": "string", "description": "通知标题, 默认'小暖'"},
+                    "title": {"type": "string", "description": "通知标题, 默认'贾维斯'"},
                 },
                 "required": ["text"],
             },
@@ -168,7 +168,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "run_scheduled",
-            "description": "定时任务: add 一次性延迟(delay 秒后执行)或 crontab 周期任务(cron 表达式, 如 '0 9 * * *' 每天9点); list 查看已有任务; remove 删除任务。输出写入 scheduled.log。定时提醒用户时, cmd 务必写成 notify text='提醒内容' title='标题' 这种格式(例如: notify text='该喝水了' title='小暖'), 系统会自动转成桌面通知; 不要手写 powershell 命令。",
+            "description": "定时任务: add 一次性延迟(delay 秒后执行)或 crontab 周期任务(cron 表达式, 如 '0 9 * * *' 每天9点); list 查看已有任务; remove 删除任务。输出写入 scheduled.log。定时提醒用户时, cmd 务必写成 notify text='提醒内容' title='标题' 这种格式(例如: notify text='该喝水了' title='贾维斯'), 系统会自动转成桌面通知; 不要手写 powershell 命令。",
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -37,7 +37,7 @@ def _sched_real_cmd(cmd: str) -> str:
                 k, _, v = p.partition("=")
                 kv[k.lower()] = v.strip("'\"")
         text = kv.get("text") or kv.get("msg") or ""
-        title = kv.get("title") or "小暖"
+        title = kv.get("title") or "贾维斯"
         if not text:
             text = cmd.replace("notify", "", 1).strip()
         py = f"from tools import notify; print(notify({json.dumps(text[:300])}, {json.dumps(title[:50])}))"

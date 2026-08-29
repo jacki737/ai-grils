@@ -8,7 +8,7 @@ import urllib.request
 from datetime import datetime
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-LOG = os.path.join(BASE, "server.log")
+LOG = os.path.join(BASE, "logs", "app.log")
 OUT = os.path.join(BASE, "monitor.log")
 PORT = 9000
 
@@ -55,9 +55,9 @@ def report(key, msg, dedup_secs=30):
 def analyze_line(line):
     global stt_empty_count, stt_bad_count, stt_empty_first, stt_bad_first
     now = time.time()
-    if "[STT] 识别到:" in line:
-        m = re.search(r"识别到: (.*?) \(([\d.]+)s\)", line)
-        txt = m.group(1) if m else line.split("识别到: ")[-1].strip()
+    if "[STT]" in line and ("ASR:" in line or "whisper:" in line):
+        m = re.search(r"(?:ASR|whisper): (.*?) \(([\d.]+)s\)", line)
+        txt = m.group(1) if m else line.split(": ")[-1].strip()
         dur = float(m.group(2)) if m and m.group(2) else 0
         if dur > 10:
             report("stt_slow", "STT 太慢: %r (%ss)" % (txt, dur))

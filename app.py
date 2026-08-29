@@ -10,7 +10,7 @@ from pathlib import Path
 
 from logsetup import setup_logging
 setup_logging()
-
+from fastapi import Response
 import fastapi
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -40,8 +40,8 @@ DEFAULT_ROLE = "jarvis"
 # ===== URL/模型名硬编码(在 core/brain/__init__.py 里) =====
 
 TOOL_TRIGGER_RE = re.compile(
-    r"打开|关闭|搜索|搜一下|查|天气|新闻|音乐|视频|下载|爬|抓取|运行|执行|启动|播放|翻译|"
-    r"计算|日历|邮件|写代码|代码|屏幕|截图|拍照|备忘|提醒|闹钟|导航|地图|知乎|微博|"
+    r"打开\s*\S+|关闭\s*\S+|搜索\s*\S+|搜一下\s*\S+|查(?:询|找|看)\s*\S+|天气|新闻|音乐|视频|下载|爬|抓取|运行|执行|启动|播放|翻译\s*\S+|"
+    r"计算\s*\S+|日历|邮件|写代码|代码|屏幕|截图|拍照|备忘|提醒|闹钟|导航|地图|知乎|微博|"
     r"哔哩|b站|bilibili|淘宝|京东|豆瓣|股票|汇率|日程|记事|文件|文件夹|目录|复制|移动|"
     r"删除|压缩|解压|安装|更新|浏览|网址|网站|网页|操作|查看|看一下|桌面|盘"
 )
@@ -421,7 +421,7 @@ def chat(body: dict):
                 history.append({"role": "assistant", "content": reply})
                 save_role_history(role, history)
                 return {"reply": reply, "tool_used": True}
-        reply = clean_reply(content) or "（小暖没想好怎么回你…）"
+        reply = clean_reply(content) or "（我一下子没想好怎么回你…）"
         history.append({"role": "user", "content": user_text})
         history.append({"role": "assistant", "content": reply})
         save_role_history(role, history)
@@ -449,12 +449,12 @@ def _run_tool_loop(task_id, role, messages, first_msg, user_text):
             "content": first_msg.get("content") or "",
             "tool_calls": first_msg.get("tool_calls") or [],
         })
-        reply = "（小暖没想好怎么回你…）"
+        reply = "（我一下子没想好怎么回你…）"
         current = first_msg
         for _ in range(8):
             calls = current.get("tool_calls") or []
             if not calls:
-                reply = clean_reply(current.get("content") or "") or "（小暖没想好怎么回你…）"
+                reply = clean_reply(current.get("content") or "") or "（我一下子没想好怎么回你…）"
                 break
             for tc in calls:
                 fname = tc.get("function", {}).get("name", "")
@@ -557,7 +557,7 @@ async def task_stream(task_id: str):
                     if event.get("type") in ("done", "error"):
                         break
                 except asyncio.TimeoutError:
-                    # 心跳：每 15 秒发个空事件保持连接
+                    # 心跳：每 1秒发个空事件保持连接
                     yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
@@ -589,7 +589,7 @@ def due_reminders():
         print(f"[due] 触发器检查异常: {e}")
     return {"messages": messages}
 
-
+#得到文本
 @app.post("/api/stt")
 async def stt(body: dict):
     """接受 JSON: {"audio": "base64..."}"""
@@ -609,7 +609,7 @@ async def stt(body: dict):
     except Exception as e:
         return {"text": f"（语音识别暂时不可用：{e}）"}
 
-
+# (带回复文本) → 得到 wav 音频 → 播放
 @app.post("/api/tts")
 async def tts(body: dict):
     text = body.get("text", "")
@@ -619,7 +619,7 @@ async def tts(body: dict):
     return Response(content=audio, media_type="audio/wav")
 
 
-from fastapi import Response
+
 import uuid
 import threading
 
@@ -637,19 +637,22 @@ def _proactive_loop():
             allowed, reason = proactive_allowed(topic)
             if not allowed:
                 continue
-            # 生成一句主动关怀/提醒
-            from core.brain import call_llm
-            msg = call_llm([
+            # 生成一句主动关怀/提醒(免费 GLM 生成; 失败直接跳过本轮, 不降级烧主模型)
+            from core.brain import call_glm
+            msg = call_glm([
                 {"role": "system", "content": "你是贾维斯。用一句话（30字内）自然地主动关怀/提醒用户，不要像机器人。示例：'该喝水了' / '外面下雨别忘带伞' / '坐久了站起来动动'。只输出这一句话。"},
                 {"role": "user", "content": f"话题: {topic}，请生成一句主动关怀"},
-            ])
-            text = (msg.get("content") or "").strip()
+            ], max_tokens=100)
+            text = ((msg or {}).get("content") or "").strip()
+            if not text:
+                print(f"[主动] GLM 未返回内容, 本轮跳过 ({topic})")
             if text:
                 text = speak_filter(text)
                 from core.tts import synthesize
-                audio = synthesize(text, "jarvis")
+                # 普通线程里没有事件循环, 用 asyncio.run 执行异步合成
+                import asyncio
+                audio = asyncio.run(synthesize(text, "jarvis"))
                 # 这里可以推送到前端播放，暂存到本地文件供前端轮询
-                import base64
                 Path("static/proactive_latest.wav").write_bytes(audio)
                 print(f"[主动] {topic}: {text}")
         except Exception as e:
@@ -659,7 +662,7 @@ def _proactive_loop():
 # 启动主动循环
 threading.Thread(target=_proactive_loop, daemon=True).start()
 
-from fastapi import Response
+
 import uuid
 
 # ===== Persona CRUD API =====

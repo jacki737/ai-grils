@@ -172,6 +172,6 @@ def open_app(name: str, args: str = ""):
                 pass
 
         return {"ok": False,
-                "error": f"没在系统里找到「{name}」的安装。可以让小暖: 1)给完整路径打开, 2)先安装这个软件, 3)告诉我它装在哪。"}
+                "error": f"没在系统里找到「{name}」的安装。可以让贾维斯: 1)给完整路径打开, 2)先安装这个软件, 3)告诉我它装在哪。"}
     except Exception as e:
         return {"ok": False, "error": f"启动失败: {e}"}

@@ -9,7 +9,6 @@ let isBusy = false;        // 全局对话锁: 防止语音/文字并发导致�
 let currentAudio = null;   // 当前播放的音频(挂断时可立即停止)
 let vadInterval = null;
 let audioChunks = [];
-let lastWakeAt = 0;
 let spokenInterrupted = false;   // 用户说话打断当前播报
 let currentSentenceFinish = null; // 当前句播放完成回调, 供打断时立即结束
 let lastSpokenText = '';         // 最近一次播报的原文, 防止回声误触发
@@ -108,10 +107,25 @@ function bufToBase64(buf) {
 }
 
 // ===== 唤醒词: 全句任意位置模糊匹配, 容忍STT转写偏差 =====
-// 变体: 贾维斯/佳维斯/加维斯/假维斯/甲维斯/家维斯/javis/jarvis/jiavis 等
-const WAKE_CORE = '(?:贾维斯|佳维斯|加维斯|假维斯|甲维斯|家维斯|驾维斯|嫁维斯|javis|jarvis|jarves|jiavis|ji\\s?a\\s?vis)';
+// 变体: 贾维斯/佳维斯/加维斯/假维斯/甲维斯/家维斯/javis/jarvis/jiavis 及 whisper 常见误听(加欸石碰/加威斯等)
+const WAKE_CORE = '(?:贾维斯|佳维斯|加维斯|假维斯|甲维斯|家维斯|驾维斯|嫁维斯|加威斯|贾威斯|家威斯|加艾斯|贾维思|加维思|加欸石碰|javis|jarvis|jarves|jiavis|ji\\s?a\\s?vis)';
 const WAKE_SUFFIX = '(?:\\s?(?:同学|童鞋|同雪))?';
 const WAKE_RE = new RegExp(WAKE_CORE + WAKE_SUFFIX, 'i');
+
+let woken = false;           // 是否处于免唤醒期
+let wakeTimer = null;        // 免唤醒倒计时
+const WAKE_HOLD_MS = 300000; // 唤醒保持 5 分钟（每次说话自动续期, 连续对话）
+
+function resetWake() {
+  woken = false;
+  if (wakeTimer) { clearTimeout(wakeTimer); wakeTimer = null; }
+}
+
+function keepAwake() {
+  woken = true;
+  if (wakeTimer) clearTimeout(wakeTimer);
+  wakeTimer = setTimeout(resetWake, WAKE_HOLD_MS);
+}
 
 // 在整句中搜索唤醒词(任意位置), 找到返回其后的指令(''=纯唤醒); 没找到返回 null
 function matchWakeWord(text) {
@@ -163,40 +177,40 @@ async function handleRecordingStop() {
       lastText = normalizeSpeech(text);
       lastTextAt = Date.now();
       setStatus('听到: ' + text, 'listening');  // 实时显示听到的内容
-      // 只有贾维斯需要"小爱"唤醒; 其他角色(痞老板等)语音正常对话
-      if (currentRole === 'jarvis') {
-        // 说"再见/拜拜"结束连续对话, 回到"只认唤醒词"状态
-        if (/再见|拜拜|退下|挂断/.test(text)) {
-          lastWakeAt = 0;
-          showL2dBubble('好的，再见。');
-          if (voiceActive) await speak('好的，再见。');
-          return;
-        }
-        const rest = matchWakeWord(text);
-        if (rest === null) {
-          // 非唤醒语句: 唤醒后 5 分钟内说的都算连续对话(每次说话自动续期); 超时回到只听唤醒词
-          if (Date.now() - lastWakeAt < 300000) { await getReply(text); lastWakeAt = Date.now(); }
-          else {
-            playChime('fail');
-            if (voiceActive) setStatus('未听到唤醒词', 'idle');
-            showL2dBubble('唤醒过期啦，再喊一声"贾维斯同学"哦');
-          }
-          return;
-        }
-        lastWakeAt = Date.now();
-playChime('wake');   // 唤醒成功即时提示音, 不等TTS
-        if (!rest) {
-          // 只喊了唤醒词, 纯唤醒: 气泡+语音简短回应, 并进入 5 分钟对话窗口
-          const wakeHint = '我会查系统状态、写故事、打开软件、放音乐、截图看屏幕，您要我做什么？';
-          showL2dBubble(wakeHint);
-          if (voiceActive) { await speak(wakeHint); setStatus('我在听...', 'listening'); }
-          return;
-        }
-        await getReply(rest);
-        lastWakeAt = Date.now();  // 回复完重新计时, 可连续对话
-      } else {
-        await getReply(text);
+// 所有角色统一唤醒逻辑
+      // 说"再见/拜拜/退下/挂断/睡吧/休息/闭嘴"结束免唤醒
+      if (/再见|拜拜|退下|挂断|睡吧|休息|闭嘴/.test(text)) {
+        resetWake();
+        showL2dBubble('好的，再见。');
+        if (voiceActive) await speak('好的，再见。');
+        return;
       }
+      const rest = matchWakeWord(text);
+      if (rest === null) {
+        // 非唤醒语句
+        if (woken) {
+          // 免唤醒期内：直接当指令
+          await getReply(text);
+          keepAwake();
+        } else {
+          playChime('fail');
+          if (voiceActive) setStatus('未听到唤醒词', 'idle');
+          showL2dBubble('喊我名字来唤醒我哦～');
+        }
+        return;
+      }
+      // 检测到唤醒词
+      keepAwake();
+      playChime('wake');
+      if (!rest) {
+        // 只喊了唤醒词
+        const wakeHint = '在，我在听。要我做什么？';
+        showL2dBubble(wakeHint);
+        if (voiceActive) { await speak(wakeHint); setStatus('我在听...', 'listening'); }
+        return;
+      }
+      await getReply(rest);
+      keepAwake();  // 成功指令后刷新免唤醒计时
     } catch (e) {
       console.warn('STT失败', e);
       if (voiceActive) setStatus('我在听...', 'listening');

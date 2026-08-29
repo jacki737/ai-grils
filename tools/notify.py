@@ -12,12 +12,12 @@ from ._paths import STATIC_DIR
 from .screen import _win_temp_paths
 
 
-def notify(text: str, title: str = "小暖"):
+def notify(text: str, title: str = "贾维斯"):
     """发送 Windows 桌面通知: 优先 Win11 原生 Toast, 失败自动降级为弹窗
 
     参数:
       text:  通知正文(必填)
-      title: 通知标题, 默认 "小暖"
+      title: 通知标题, 默认 "贾维斯"
     返回: {"ok": True, "msg": ...} 或错误 dict。
     """
     if not text or not text.strip():
@@ -30,7 +30,7 @@ def notify(text: str, title: str = "小暖"):
         with open(wsl_txt, "w", encoding="utf-8") as f:
             f.write(text[:300])
         with open(wsl_ttl, "w", encoding="utf-8") as f:
-            f.write(title[:50] or "小暖")
+            f.write(title[:50] or "贾维斯")
         script = os.path.join(STATIC_DIR, "toast_helper.ps1")
         if not os.path.exists(script):
             return {"ok": False, "error": "缺少 static/toast_helper.ps1"}

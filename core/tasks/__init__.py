@@ -94,12 +94,12 @@ def _run_tool_loop(task_id, role, messages, first_msg, user_text):
             "content": first_msg.get("content") or "",
             "tool_calls": first_msg.get("tool_calls") or [],
         })
-        reply = "（小暖没想好怎么回你...）"
+        reply = "（我一下子没想好怎么回你...）"
         current = first_msg
         for round_idx in range(8):
             calls = current.get("tool_calls") or []
             if not calls:
-                reply = clean_reply(current.get("content") or "") or "（小暖没想好怎么回你...）"
+                reply = clean_reply(current.get("content") or "") or "（我一下子没想好怎么回你...）"
                 break
             _emit(task_id, {"type": "progress", "round": round_idx + 1, "calls": len(calls)})
             for tc in calls:

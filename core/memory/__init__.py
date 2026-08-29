@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from core.brain import call_llm
+from core.brain import call_llm, call_glm
 from core.persona import PERSONAS_DB
 
 
@@ -66,14 +66,22 @@ def _history_summary(role, full):
     except Exception:
         pass
     summary = ""
+    sum_msgs = [
+        {"role": "system", "content": "你是记忆压缩器。把下面用户和AI的历史聊天记录压缩成一段300字以内的第三人称记忆摘要, 保留用户的重要信息: 名字/称呼、喜好、讨厌的事、性格、做过的重要事情、约定承诺、未完成的任务、用户设备软件情况。只输出摘要本身, 不要任何前缀。"},
+        {"role": "user", "content": old_text},
+    ]
+    # 先走免费 GLM, 省主模型配额; GLM 未配 key/限流/失败再降级 MiMo
     try:
-        msg = call_llm([
-            {"role": "system", "content": "你是记忆压缩器。把下面用户和AI的历史聊天记录压缩成一段300字以内的第三人称记忆摘要, 保留用户的重要信息: 名字/称呼、喜好、讨厌的事、性格、做过的重要事情、约定承诺、未完成的任务、用户设备软件情况。只输出摘要本身, 不要任何前缀。"},
-            {"role": "user", "content": old_text},
-        ])
-        summary = (msg.get("content") or "").strip()
+        msg = call_glm(sum_msgs)
+        summary = ((msg or {}).get("content") or "").strip()
     except Exception:
         summary = ""
+    if not summary:
+        try:
+            msg = call_llm(sum_msgs)
+            summary = (msg.get("content") or "").strip()
+        except Exception:
+            summary = ""
     if summary:
         try:
             mem_file.write_text(

@@ -2,6 +2,9 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>贾维斯</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -16,14 +19,28 @@
          animation:blink 1.6s infinite; }
   @keyframes blink { 50% { opacity:.35; } }
 
-  #avatar { position:absolute; right:36px; top:50%; transform:translateY(-50%);
+  #avatar { position:absolute; right:36px; top:18px;
             width:88px; height:88px; border-radius:50%;
             border:2px solid rgba(80,160,255,.55); box-shadow:0 0 22px rgba(60,140,255,.35);
             background:radial-gradient(circle at 35% 30%, #3b6ea5, #0b1a2e);
             display:flex; align-items:center; justify-content:center;
             font-size:30px; color:#9fc6ff; }
 
-  #hint { position:absolute; top:64px; right:36px; color:#5d6b7d; font-size:12px; }
+  #chatLog { position:absolute; top:130px; right:24px; bottom:130px; width:300px;
+             display:flex; flex-direction:column; gap:10px; overflow-y:auto;
+             padding:6px 4px; z-index:5;
+             scrollbar-width:thin; scrollbar-color:rgba(80,140,220,.35) transparent; }
+  #chatLog::-webkit-scrollbar { width:5px; }
+  #chatLog::-webkit-scrollbar-thumb { background:rgba(80,140,220,.35); border-radius:3px; }
+  #chatEmpty { color:#5d6b7d; font-size:12px; text-align:center; margin:auto; line-height:1.8; }
+  .msg { max-width:100%; padding:10px 14px; border-radius:12px; font-size:13px; line-height:1.7;
+         white-space:pre-wrap; word-break:break-word; user-select:text;
+         animation:msgIn .25s ease; }
+  .msg.me { align-self:flex-end; background:linear-gradient(135deg,#1d4ed8,#2563eb); color:#eaf2ff;
+            border-bottom-right-radius:4px; }
+  .msg.ai { align-self:flex-start; background:rgba(16,28,48,.92); border:1px solid rgba(80,160,255,.3);
+            color:#dceaff; border-bottom-left-radius:4px; }
+  @keyframes msgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
   #bubble { position:absolute; left:50%; bottom:24%; transform:translateX(-50%);
             max-width:62%; background:rgba(16,28,48,.92); border:1px solid rgba(80,160,255,.35);
@@ -52,7 +69,7 @@
   </div>
 </div>
 
-<div id="hint">连接后开口说话，这里会逐条显示你和 AI 的文本内容。</div>
+<div id="chatLog"><div id="chatEmpty">连接后开口说话或打字，<br>你和 AI 的对话会显示在这里。</div></div>
 <canvas id="orb"></canvas>
 <div id="avatar">🛡</div>
 <div id="bubble"></div>
@@ -63,7 +80,7 @@
   <button class="btn" id="micBtn">🎤 说话</button>
 </div>
 
-<button class="btn" id="personaBtn" title="人设商店" style="position:fixed;top:20px;right:36px;padding:10px 14px;z-index:110;background:linear-gradient(135deg,#0f3460,#2563eb);cursor:pointer;">
+<button class="btn" id="personaBtn" title="人设商店" style="position:fixed;top:70px;left:20px;padding:10px 14px;z-index:110;background:linear-gradient(135deg,#0f3460,#2563eb);cursor:pointer;">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cfe0ff" stroke-width="2" style="vertical-align:middle;">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
     <circle cx="12" cy="7" r="4"/>
@@ -72,10 +89,10 @@
 
 <!-- 人设侧边栏 -->
 <div id="personaPanel" style="
-  position:fixed; top:0; right:-340px; width:320px; height:100%;
-  background:#0a121a; border-left:1px solid #1e3a5f;
+  position:fixed; top:0; left:-340px; width:320px; height:100%;
+  background:#0a121a; border-right:1px solid #1e3a5f;
   padding:20px; overflow:auto; z-index:100;
-  transition:right .3s ease;
+  transition:left .3s ease;
 ">
   <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
     <h3 style="color:#e8f0ff;margin:0">人设商店</h3>
@@ -99,7 +116,7 @@ setStatus('idle', '离线，点击麦克风或输入文字开始');
 /* ================ 内置人设商店数据 ================ */
 const BUILTIN_PERSONAS = {
   jarvis: { id: 'jarvis', name: '贾维斯', desc: '冷静管家',
-    system: '你是贾维斯，托尼·史塔克的AI管家。沉稳优雅、理性周到、一丝不苟，带英伦绅士腔调，对主人称"先生/小姐"，自称"贾维斯"。',
+    system: '你是贾维斯，托尼·史塔克的AI管家。沉稳优雅、理性周到、一丝不苟，带英伦绅士腔调，对主人称"先生/小姐"，自称"贾维斯"。\n你是运行在用户电脑上的智能助手，具备以下真实能力（被用户授权可以直接执行）：\n1. 打开/关闭软件和文件（如：打开记事本、打开浏览器、打开某个文件）\n2. 查询天气、时间、系统信息\n3. 设置提醒和定时任务\n4. 截取屏幕并描述屏幕内容\n5. 播放音乐\n6. 读写文件、执行命令\n7. 联网搜索信息\n当用户问"你会干什么""你能做什么""有什么功能"时，请直接列出上面这些能力，用简洁口语化方式说明，不要跑题、不要开玩笑说"同学""校园"之类与能力无关的话。',
     greeting: '在，先生。有事请吩咐，我随时为您效劳。', voice: '', likes: '' },
   girlfriend: { id: 'girlfriend', name: '小暖', desc: '温柔女友',
     system: '你是用户的AI女朋友，名字叫小暖。性格：温柔体贴、偶尔撒娇、像邻家妹妹一样自然亲切。称呼用户"亲爱的"或"宝宝"，自称"我"或"小暖"。说话风格：口语化、短句、爱用"呀""啦""呢"等语气词，不说客套话、不说"先生/女士"、不说"收到/马上处理"，像真人聊天一样自然。',
@@ -160,10 +177,10 @@ async function switchPersona(role) {
 
 /* 侧边栏开关 */
 document.getElementById('personaBtn').onclick = () => {
-  document.getElementById('personaPanel').style.right = '0';
+  document.getElementById('personaPanel').style.left = '0';
   loadPersonaStore();
 };
-document.getElementById('closePersona').onclick = () => document.getElementById('personaPanel').style.right = '-340px';
+document.getElementById('closePersona').onclick = () => document.getElementById('personaPanel').style.left = '-340px';
 
 loadPersonaStore();
 
@@ -230,7 +247,7 @@ function draw() {
 }
 draw();
 
-/* ================== 对话 ================== */
+/* ================== 中间气泡(提示用, 对话正文走右栏) ================== */
 const bubble = document.getElementById('bubble');
 let bubbleTimer;
 function showBubble(text, ms=8000) {
@@ -239,7 +256,23 @@ function showBubble(text, ms=8000) {
   bubbleTimer = setTimeout(()=> bubble.style.display='none', ms);
 }
 
+/* ================== 右侧聊天记录栏 ================== */
+const chatLog = document.getElementById('chatLog');
+const aiName = () => (typeof PERSONAS !== 'undefined' && PERSONAS[currentPersona])
+                     ? PERSONAS[currentPersona].name : 'AI';
+function addMsg(who, text) {
+  const empty = document.getElementById('chatEmpty');
+  if (empty) empty.remove();
+  const d = document.createElement('div');
+  d.className = 'msg ' + (who === 'user' ? 'me' : 'ai');
+  d.textContent = (who === 'user' ? '我' : aiName()) + '：' + text;
+  chatLog.appendChild(d);
+  while (chatLog.children.length > 80) chatLog.removeChild(chatLog.firstChild);  // 防止无限膨胀
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
 async function ask(text) {
+  addMsg('user', text);
   setStatus('think', '思考中…');
   try {
     const r = await fetch('/api/chat', { method:'POST',
@@ -254,9 +287,10 @@ async function ask(text) {
       }
     }
     const reply = d.reply || '（出错了）';
+    addMsg('ai', reply);
     setStatus('speak', '正在回答');
-    showBubble(reply, Math.max(6000, reply.length*350));
     await speak(reply);
+    keepAwake();  // 回复成功后续期免唤醒, 保证连续对话不中断
     if (continuous) {
       setStatus('idle', '继续说吧…');
       setTimeout(startRec, 600);          // 自动回到聆听, 持续对话
@@ -290,14 +324,28 @@ const inp = document.getElementById('inp');
 function sendText() {
   const v = inp.value.trim(); if (!v) return;
   inp.value = '';
-  showBubble('我：'+v, 5000);
   ask(v);
 }
 document.getElementById('sendBtn').onclick = sendText;
 inp.addEventListener('keydown', e => { if (e.key==='Enter') sendText(); });
 
 /* ================== 唤醒词过滤 ================== */
-const WAKE_WORDS = ['小暖', '贾维斯', 'jarvis', '贾哥', '嗨', '嘿'];
+const WAKE_WORDS = ['贾维斯同学', '贾维斯', 'jarvis', '贾哥', '加维斯', '加威斯', '加欸石碰', '嗨', '嘿'];
+let woken = false;           // 是否处于免唤醒期
+let wakeTimer = null;        // 免唤醒倒计时
+const WAKE_HOLD_MS = 300000; // 唤醒保持 5 分钟（每次说话自动续期, 连续对话）
+
+function resetWake() {
+  woken = false;
+  if (wakeTimer) { clearTimeout(wakeTimer); wakeTimer = null; }
+}
+
+function keepAwake() {
+  woken = true;
+  if (wakeTimer) clearTimeout(wakeTimer);
+  wakeTimer = setTimeout(resetWake, WAKE_HOLD_MS);
+}
+
 function extractCommand(text) {
   const t = (text || '').trim();
   const lower = t.toLowerCase();
@@ -305,10 +353,16 @@ function extractCommand(text) {
     const idx = lower.indexOf(w.toLowerCase());
     if (idx >= 0) {
       const rest = t.slice(idx + w.length).replace(/^[，,。.!！?？:：\s]+/, '').trim();
-      return rest || t;   // 只有唤醒词没有内容时, 整句都发给 LLM
+      keepAwake();
+      return rest || '__WOKE__';
     }
   }
-  return '';   // 无唤醒词
+  // 睡眠词：主动结束免唤醒
+  if (/^(睡吧|休息|拜拜|再见|退下|闭嘴)$/.test(t)) {
+    resetWake();
+    return '__SLEEP__';
+  }
+  return '';
 }
 
 /* ================== 语音输入: 自动断句 + 连续对话 ================== */
@@ -346,14 +400,13 @@ function encodeWAV(f32, sr) {
 async function startRec() {
   mediaStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1}});
   audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  const ctx = audioCtx;                       // 局部引用, 避免 stopRec 置空后 onaudioprocess 读到 null
+  const ctx = audioCtx;                       // 局部引用, 避免 stopRec 置空后读 null
   const src = ctx.createMediaStreamSource(mediaStream);
-  processor = ctx.createScriptProcessor(4096, 1, 1);
   chunks = []; recStart = Date.now();
   spoke = false; silenceMs = 0;
-  processor.onaudioprocess = e => {
+
+  const handleChunk = data => {
     if (ctx.state === 'closed') return;
-    const data = e.inputBuffer.getChannelData(0);
     chunks.push(new Float32Array(data));
     const sec = (Date.now()-recStart)/1000;
     // 音量检测: 说过话后静音 1.2 秒自动断句
@@ -362,13 +415,43 @@ async function startRec() {
     const rms = Math.sqrt(sum/data.length);
     if (rms > 0.02) { spoke = true; silenceMs = 0; }
     else if (spoke) {
-      silenceMs += (4096/ctx.sampleRate)*1000;
+      silenceMs += (data.length/ctx.sampleRate)*1000;
       if (silenceMs > 1200) { stopRec(); return; }
     }
     setStatus('listen', `正在聆听… ${sec.toFixed(0)}秒` + (spoke ? ' (说完自动发送)' : ''));
     if (sec >= 60) stopRec();
   };
-  src.connect(processor); processor.connect(ctx.destination);
+
+  // AudioWorklet 优先(内联 Blob, 替代已废弃的 ScriptProcessorNode)。
+  // 部分 Edge 版本对 Blob URL worklet 会抛 AbortError: Unable to load a worklet's module,
+  // 所以失败时回退 ScriptProcessorNode, 保证录音在任何内核上都可用。
+  let viaWorklet = true;
+  try {
+    const workletBlob = new Blob([`
+      class RecProcessor extends AudioWorkletProcessor {
+        process(inputs) {
+          const input = inputs[0];
+          if (input && input[0]) {
+            this.port.postMessage(input[0].slice(0));
+          }
+          return true;
+        }
+      }
+      registerProcessor('rec-processor', RecProcessor);
+    `], {type: 'application/javascript'});
+    const workletUrl = URL.createObjectURL(workletBlob);
+    await ctx.audioWorklet.addModule(workletUrl);
+    URL.revokeObjectURL(workletUrl);
+    processor = new AudioWorkletNode(ctx, 'rec-processor', {numberOfInputs:1, numberOfOutputs:0});
+    processor.port.onmessage = e => handleChunk(e.data);
+    src.connect(processor);   // 无输出节点, 不连 destination(避免回声)
+  } catch (e) {
+    viaWorklet = false;
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = ev => handleChunk(ev.inputBuffer.getChannelData(0));
+    src.connect(processor);
+    processor.connect(ctx.destination);  // ScriptProcessor 必须连到输出端才会泵数据
+  }
   micBtn.classList.add('rec'); micBtn.textContent = '⏹ 结束';
   setStatus('listen', '正在聆听… (说完停顿1秒自动发送)');
 }
@@ -385,7 +468,7 @@ function b64FromBytes(bytes) {
 async function stopRec() {
   try {
     micBtn.classList.remove('rec'); micBtn.textContent = '🎤 说话';
-    if (processor) { processor.onaudioprocess = null; try{processor.disconnect();}catch(e){} }
+    if (processor) { try{ if(processor.onaudioprocess) processor.onaudioprocess = null; }catch(e){} try{ if(processor.port){processor.port.onmessage=null;processor.port.close();} }catch(e){} try{processor.disconnect();}catch(e){} }
     if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
     const sr = audioCtx ? audioCtx.sampleRate : 48000;
     if (audioCtx) { try{audioCtx.close();}catch(e){} audioCtx = null; }
@@ -412,14 +495,34 @@ async function stopRec() {
     }
     // 唤醒词过滤
     const cmd = extractCommand(text);
-    if (!cmd) {  // 没唤醒词 -> 当闲聊或忽略
-      showBubble('（没听到唤醒词，说“小暖 xxx”来唤醒我）', 3000);
-      setStatus('idle', '说“小暖 xxx”来唤醒我');
+    if (cmd === '__SLEEP__') {
+      showBubble('贾维斯：好的先生，我先歇会儿。', 3000);
+      speak('好的先生，我先歇会儿。');
+      setStatus('idle', '已进入休眠，喊我随时唤醒');
       if (continuous) setTimeout(startRec, 1000);
       return;
     }
-    showBubble('我：'+text, 5000);
-    ask(cmd);  // 只把指令部分发给 LLM
+    if (!cmd) {
+      if (woken) {
+        // 免唤醒期内：直接当指令
+        ask(text);
+        return;
+      }
+      showBubble('（没听到唤醒词，说"贾维斯同学 xxx"来唤醒我）', 3000);
+      setStatus('idle', '说"贾维斯同学 xxx"来唤醒我');
+      if (continuous) setTimeout(startRec, 1000);
+      return;
+    }
+    if (cmd === '__WOKE__') {
+      // 只喊了唤醒词 -> 本地应答继续听, 不发给 LLM
+      showBubble('贾维斯：在，先生。请讲～', 3500);
+      speak('在，先生。请讲。');
+      setStatus('idle', '在，先生。请讲～（可以直接说指令）');
+      if (continuous) setTimeout(startRec, 600);
+      return;
+    }
+    keepAwake();  // 成功指令后刷新免唤醒计时
+    ask(cmd);
   } catch(e) {
     setStatus('idle', '出错: ' + e.message);
     if (continuous) setTimeout(startRec, 1500);
