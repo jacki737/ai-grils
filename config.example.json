@@ -1,0 +1,19 @@
+{
+  "mimo_key": "",
+  "dashscope_key": "",
+  "dashscope_asr_key": "",
+  "tool_key": "",
+  "vision_key": "",
+  "zhipu_key": "",
+  "volc_appid": "",
+  "volc_token": "",
+  "volc_secret": "",
+  "baidu_asr_app_id": "",
+  "baidu_asr_api_key": "",
+  "baidu_asr_secret_key": "",
+  "baidu_app_id": "",
+  "baidu_api_key": "",
+  "baidu_secret_key": "",
+  "max_per_hour": 1,
+  "max_per_day": 5
+}

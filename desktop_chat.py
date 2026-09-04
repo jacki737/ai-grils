@@ -11,6 +11,7 @@ import threading
 import time
 import urllib.request
 import wave
+from pathlib import Path
 
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
@@ -23,7 +24,7 @@ def _log(msg):
     line = f"[{time.strftime('%H:%M:%S')}] {msg}"
     print(line)
     try:
-        with open(r"E:\ai-girlfriend\desktop_chat.log", "a", encoding="utf-8") as f:
+        with open(Path(__file__).with_name("desktop_chat.log"), "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
         pass

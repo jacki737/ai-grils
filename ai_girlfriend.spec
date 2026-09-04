@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # 项目根目录
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(SPECPATH)
 
 # PyInstaller 配置
 block_cipher = None
@@ -104,12 +104,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-
-# 添加运行时钩子
-a.datas += [
-    (str(PROJECT_ROOT / 'config.json'), '.'),
-    (str(PROJECT_ROOT / 'personas.json'), '.'),
-]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

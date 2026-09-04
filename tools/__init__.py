@@ -28,6 +28,8 @@ from .shell import run_shell
 from .sysinfo import system_info
 from .weather import get_weather
 from .script_gen import gen_script
+from .train_ticket import query_trains
+from .price_search import search_price
 
 # 工具注册表: 名字 -> 函数。exec_tool 靠它派发, 加新工具要在这里登记。
 TOOL_FUNCS = {
@@ -56,6 +58,8 @@ TOOL_FUNCS = {
     "list_triggers": list_triggers,
     "get_weather": get_weather,
     "gen_script": gen_script,
+    "query_trains": query_trains,
+    "search_price": search_price,
 }
 
 # 日志落在项目根(拆分后 __file__ 指向 tools/ 子目录, 不能再用它拼路径)

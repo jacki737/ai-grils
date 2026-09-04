@@ -4,16 +4,16 @@
 <meta charset="UTF-8">
 <title>pet</title>
 <style>
-  /* 魔法绿背景: 会被 Win32 色键抠成全透明 */
+  /* 真透明: WebView2 DefaultBackgroundColor=Transparent, 页面背景必须透明 */
   html, body {
     margin: 0; padding: 0;
     width: 100%; height: 100%;
-    background: #00ff00 !important;
+    background: transparent !important;
     overflow: hidden;
   }
   #petContainer {
     position: fixed; inset: 0;
-    background: #00ff00;
+    background: transparent;
   }
   #l2dCanvas { display: none; }
   #bubble {

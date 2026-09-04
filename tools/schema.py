@@ -355,4 +355,35 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_trains",
+            "description": "查12306火车票余票(高铁/动车/普快都支持, 无需登录)。用户说'查一下明天北京到上海的高铁票'/'火车票还有吗'/'XX到XX的车次'时用这个。date 支持 今天/明天/后天/大后天 或 2026-08-31 格式。只查询和提醒, 购票要用户自己拿着链接去12306完成。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_city": {"type": "string", "description": "出发城市或站名, 如 '北京'/'上海虹桥'"},
+                    "to_city": {"type": "string", "description": "到达城市或站名, 如 '上海'/'北京南'"},
+                    "date": {"type": "string", "description": "乘车日期: 今天/明天/后天/大后天 或 YYYY-MM-DD, 默认今天"},
+                    "top": {"type": "integer", "description": "最多播报几趟车, 默认 8"},
+                },
+                "required": ["from_city", "to_city"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_price",
+            "description": "帮用户全网比价: 把『关键词』的京东搜索页和购物党全网比价页直接打开到浏览器里, 由用户亲眼比较各渠道价格。用户说'XX最便宜多少钱'/'帮我比个价'/'XX多少钱能买到'时用这个。注意: 本工具不返回具体价格数字, 打开后可提醒用户自己看, 或用浏览器工具读取页面。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "商品关键词, 如 'sony a7m4'/'戴森v8'/'瑞幸咖啡券'"},
+                },
+                "required": ["keyword"],
+            },
+        },
+    },
 ]

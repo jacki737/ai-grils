@@ -1,3 +1,3 @@
 @echo off
-cd /d E:\ai-girlfriend
+cd /d "%~dp0"
 python app.py

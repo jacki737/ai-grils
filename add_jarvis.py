@@ -1,6 +1,7 @@
 import sqlite3
+from pathlib import Path
 
-conn = sqlite3.connect(r'E:\ai-girlfriend\personas.db')
+conn = sqlite3.connect(str(Path(__file__).with_name("personas.db")))
 c = conn.cursor()
 
 c.execute('SELECT id FROM personas WHERE id=?', ('jarvis',))

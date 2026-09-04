@@ -91,7 +91,8 @@ def call_llm(messages, tools=None):
         if not key:
             return {"role": "assistant", "content": "（请先点右上角 ⚙ 设置, 填写 MiMo token, 否则我没法聊天哦）"}
 
-    body = {"model": model, "messages": messages, "max_tokens": 3000, "temperature": 0.9}
+    # 闲聊限制输出长度: 长回复非流式生成要 20~30s, 是语音回复慢的主因; 工具/视觉保留 3000
+    body = {"model": model, "messages": messages, "max_tokens": 3000 if tools else 1000, "temperature": 0.9}
     if tools and not _has_image(messages):
         body["tools"] = tools
     # 豆包必须关思考(闲聊17s→2.5s); 小米/智谱/OpenRouter 不传此参数

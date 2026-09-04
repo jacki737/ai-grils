@@ -1,6 +1,7 @@
 // ===== Live2D 立绘(shizuku) + 说话口型 =====
 // 调优参数: 改这里的数字即可微调
 const L2D_CFG = {
+  modelPath: '/static/live2d/model/Haru/Haru.model3.json', // 模型路径，可覆盖
   fitScale: 0.95,     // 立绘适配容器后的整体缩放(小于1更小)
   posY: 4,            // 立绘底部距容器底部的像素偏移
   mouthInterval: 110, // 口型刷新间隔 ms
@@ -32,7 +33,7 @@ function initLive2D() {
     autoDensity: true,
     resolution: Math.min(window.devicePixelRatio || 1, 2)
   });
-  PIXI.live2d.Live2DModel.from('/static/live2d/model/Haru/Haru.model3.json')
+  PIXI.live2d.Live2DModel.from(L2D_CFG.modelPath)
     .then(model => {
       l2dModel = model;
       model.anchor.set(0.5, 1);

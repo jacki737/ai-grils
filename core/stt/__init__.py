@@ -1,4 +1,4 @@
-"""语音识别: 百度 ASR 优先, 阿里 DashScope 次之, 小米 MiMo 兜底"""
+"""语音识别: 小米 MiMo 优先(最快最稳), 百度/阿里 DashScope 兜底"""
 import json
 import time
 import aiohttp
@@ -183,9 +183,18 @@ def _valid_text(text: str) -> bool:
 
 
 async def transcribe(audio_bytes: bytes) -> str:
-    """百度 ASR → DashScope → MiMo"""
+    """MiMo ASR 优先(实测最快最稳) → 百度 → DashScope
+    (百度 3302 无权限 / DashScope 欠费, 每句空跑 ~1.5s, 故降为兜底)"""
     t0 = time.time()
-    # 1. 百度 ASR
+    # 1. MiMo ASR
+    try:
+        text = await _mimo_asr_transcribe(audio_bytes)
+        logger.info(f"[STT] MiMo ASR: {text} ({time.time()-t0:.1f}s)")
+        if _valid_text(text):
+            return text
+    except Exception as e:
+        logger.warning(f"[STT] MiMo ASR 失败({e}), 降级百度")
+    # 2. 百度 ASR
     try:
         text = await _baidu_asr_transcribe(audio_bytes)
         logger.info(f"[STT] 百度 ASR: {text} ({time.time()-t0:.1f}s)")
@@ -193,20 +202,12 @@ async def transcribe(audio_bytes: bytes) -> str:
             return text
     except Exception as e:
         logger.warning(f"[STT] 百度 ASR 失败({e}), 降级 DashScope")
-    # 2. DashScope
-    try:
-        text = await _dashscope_asr_transcribe(audio_bytes)
-        logger.info(f"[STT] DashScope ASR: {text} ({time.time()-t0:.1f}s)")
-        if _valid_text(text):
-            return text
-    except Exception as e:
-        logger.warning(f"[STT] DashScope ASR 失败({e}), 降级 MiMo")
-    # 3. MiMo
-    try:
-        text = await _mimo_asr_transcribe(audio_bytes)
-        logger.info(f"[STT] MiMo ASR: {text} ({time.time()-t0:.1f}s)")
-        if _valid_text(text):
-            return text
-    except Exception as e:
-        logger.warning(f"[STT] MiMo ASR 失败({e})")
+    # # 3. DashScope
+    # try:
+    #     text = await _dashscope_asr_transcribe(audio_bytes)
+    #     logger.info(f"[STT] DashScope ASR: {text} ({time.time()-t0:.1f}s)")
+    #     if _valid_text(text):
+    #         return text
+    # except Exception as e:
+    #     logger.warning(f"[STT] DashScope ASR 失败({e})")
     return "（语音识别暂不可用，请用文字聊天哦～）"

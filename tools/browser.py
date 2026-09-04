@@ -16,7 +16,17 @@ _browser_singleton = {"browser": None, "page": None, "mode": "headless", "chrome
 
 
 def _find_chrome():
-    """探测本机是否安装了真正的 Google Chrome(Linux 常见路径)"""
+    """探测本机是否安装了真正的 Google Chrome(Windows/Linux 常见路径)"""
+    if os.name == "nt":
+        cands = [
+            os.path.join(os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+                         r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+                         r"Google\Chrome\Application\chrome.exe"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                         r"Google\Chrome\Application\chrome.exe"),
+        ]
+        return next((c for c in cands if c and os.path.isfile(c)), None)
     for cand in ("google-chrome", "google-chrome-stable",
                  "/usr/bin/google-chrome", "/opt/google/chrome/chrome"):
         if os.path.isfile(cand) or shutil.which(cand):
@@ -54,33 +64,34 @@ def _get_page():
     browser = None
     if mode == "headful":
         try:
-            # 有头模式: 优先真正的 Google Chrome, 否则默认 Chromium, 可见窗口 + 1280x800
+            # 有头模式: 优先真正的 Google Chrome, 可见窗口 + 1280x800
             if _find_chrome():
                 browser = pw.chromium.launch(
                     headless=False, channel="chrome",
                     args=["--window-size=1280,800"],
                 )
                 used_chrome = True
-            else:
-                browser = pw.chromium.launch(
-                    headless=False,
-                    args=["--window-size=1280,800"],
-                )
         except Exception:
-            if used_chrome:
-                # Chrome 启动失败(缺依赖等) → 回退 Chromium 有头
+            browser = None
+        if browser is None:
+            # Chrome 没有/启动失败 → Edge(Windows 自带) → 自带 Chromium, 逐级回退
+            for channel in ("msedge", None):
                 try:
-                    browser = pw.chromium.launch(
-                        headless=False,
-                        args=["--window-size=1280,800"],
-                    )
-                    used_chrome = False
+                    if channel:
+                        browser = pw.chromium.launch(
+                            headless=False, channel=channel,
+                            args=["--window-size=1280,800"],
+                        )
+                    else:
+                        browser = pw.chromium.launch(
+                            headless=False,
+                            args=["--window-size=1280,800"],
+                        )
+                    break
                 except Exception:
                     browser = None
-            else:
-                browser = None
             if browser is None:
-                # 有头启动抛异常(显示不可用等) → 降级无头, 避免崩溃
+                # 全部失败(显示不可用等) → 降级无头, 避免崩溃
                 mode = "headless"
     if browser is None:
         browser = pw.chromium.launch(
@@ -135,7 +146,9 @@ def browser(action: str, **kw):
     try:
         page = _get_page()
     except Exception as e:
-        return {"ok": False, "error": f"浏览器启动失败: {e}(可能需要: sudo python3 -m playwright install-deps chromium)"}
+        hint = ("python -m playwright install chromium" if os.name == "nt"
+                else "sudo python3 -m playwright install-deps chromium")
+        return {"ok": False, "error": f"浏览器启动失败: {e}(可能需要: {hint})"}
 
     try:
         if action == "open":

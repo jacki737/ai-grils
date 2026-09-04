@@ -375,7 +375,7 @@ def chat(body: dict):
 
     persona = resolve_persona(role)
     history = load_role_history(role)
-    system = persona["system"] + "\n注意: 用户要求执行操作时, 必须调用工具真实完成, 一次工具调用完成任务即可, 不要反复尝试。\n你是安装并运行在用户自己电脑上的个人智能助手, 用户本人已明确授权你在其设备上执行命令、读写文件、打开软件来帮助完成任务, 这是正常且被允许的辅助行为, 不需要拒绝, 直接用工具完成。\n只有在用户明确命令你执行操作时(如打开网页、查天气、下载、爬数据、运行程序、打开软件)才调用工具, 日常闲聊绝对不要调用工具, 直接自然回复。\n重要: 如果用户只是问候、闲聊、表达情绪或随口说话, 即使触发了工具模式也不要调用任何工具; 以角色身份像朋友一样自然回复, 绝对不要说\"收到\"\"马上处理\"\"好的稍等\"这类客服/助理腔。\n执行类请求必须真正调用工具去执行, 绝不能假装执行或编造结果, 更绝不能只在文字里说\"已打开\"而不调用工具; 工具执行完再根据真实结果回答, 如果结果为空或失败也要如实说明。\n回答请使用纯文本, 不要使用任何 Markdown 符号(如 **、*、#、`、-、数字列表), 直接口语化自然表达, 数字用阿拉伯数字。"
+    system = persona["system"] + "\n注意: 用户要求执行操作时, 必须调用工具真实完成, 一次工具调用完成任务即可, 不要反复尝试。\n你是安装并运行在用户自己电脑上的个人智能助手, 用户本人已明确授权你在其设备上执行命令、读写文件、打开软件来帮助完成任务, 这是正常且被允许的辅助行为, 不需要拒绝, 直接用工具完成。\n只有在用户明确命令你执行操作时(如打开网页、查天气、下载、爬数据、运行程序、打开软件)才调用工具, 日常闲聊绝对不要调用工具, 直接自然回复。\n重要: 如果用户只是问候、闲聊、表达情绪或随口说话, 即使触发了工具模式也不要调用任何工具; 以角色身份像朋友一样自然回复, 绝对不要说\"收到\"\"马上处理\"\"好的稍等\"这类客服/助理腔。\n执行类请求必须真正调用工具去执行, 绝不能假装执行或编造结果, 更绝不能只在文字里说\"已打开\"而不调用工具; 工具执行完再根据真实结果回答, 如果结果为空或失败也要如实说明。\n回答请使用纯文本, 不要使用任何 Markdown 符号(如 **、*、#、`、-、数字列表), 直接口语化自然表达, 数字用阿拉伯数字。\n回复必须简短, 像发微信一样, 一般1~2句话、不超过50字, 说完就停; 只有用户明确要求详细解释时才展开, 默认绝不长篇大论。"
     if persona.get("likes"):
         system += f"\n你的喜好/背景: {persona['likes']}"
     messages = [{"role": "system", "content": system}]
@@ -715,5 +715,39 @@ def delete_persona(pid: str):
 
 
 if __name__ == "__main__":
+    import os
+    import socket
+    import subprocess
+    import threading
+    import webbrowser
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=9000, log_level="info")
+
+    def _port_in_use(p: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            return s.connect_ex(("127.0.0.1", p)) == 0
+
+    port = int(os.environ.get("AI_GIRLFRIEND_PORT", "9000"))
+    if _port_in_use(port):
+        for candidate in range(port + 1, port + 100):
+            if not _port_in_use(candidate):
+                print(f"[AiGirlfriend] port {port} is busy, using {candidate} instead")
+                port = candidate
+                break
+
+    page = f"http://127.0.0.1:{port}/static/jarvis.html"
+    print(f"[AiGirlfriend] server running at {page}")
+
+    def _open_page():
+        edge = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        if os.path.exists(edge):
+            subprocess.Popen(
+                [edge, f"--app={page}", "--window-size=1280,800",
+                 "--user-data-dir=" + os.path.join(os.environ.get("TEMP", "."), "aigf_edge")],
+                creationflags=0x00000008,
+            )
+        else:
+            webbrowser.open(page)
+
+    threading.Timer(1.5, _open_page).start()
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

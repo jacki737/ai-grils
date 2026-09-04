@@ -1,4 +1,4 @@
-"""语音合成: Audio8-TTS (本地 ONNX CPU) 为主, 百度/Edge-TTS 兜底"""
+"""语音合成: 百度/Edge-TTS 云端为主"""
 import json
 import time
 import aiohttp
@@ -12,8 +12,6 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-AUDIO8_TTS_BASE = "http://127.0.0.1:8024"
-
 
 def load_config():
     p = Path(__file__).parent.parent.parent / "config.json"
@@ -23,25 +21,12 @@ def load_config():
         return {}
 
 
-async def _audio8_tts_synthesize(text: str, voice: str = "speaker_a") -> bytes:
-    """Audio8-TTS 本地推理 (OpenAI 兼容 /v1/audio/speech)"""
-    url = f"{AUDIO8_TTS_BASE}/v1/audio/speech"
-    body = {"model": "arktts", "input": text, "voice": voice, "response_format": "wav"}
-    headers = {"Content-Type": "application/json"}
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as r:
-            if r.status != 200:
-                data = await r.json()
-                raise RuntimeError(f"Audio8-TTS {r.status}: {json.dumps(data, ensure_ascii=False)[:200]}")
-            return await r.read()
-
-
 async def _baidu_tts_synthesize(text: str, voice: int = 0) -> bytes:
     """百度云语音合成 (REST API, 需先获取 access_token)"""
     cfg = load_config()
-    app_id = cfg.get("baidu_app_id") or "7965794"
-    api_key = cfg.get("baidu_api_key") or "FwcSekXiHGE9h2RtYTvFj72O"
-    secret_key = cfg.get("baidu_secret_key") or "R8SxpowFMkbnjxQFPt99ouUmpMSMj12r"
+    app_id = cfg.get("baidu_app_id")
+    api_key = cfg.get("baidu_api_key")
+    secret_key = cfg.get("baidu_secret_key")
     
     # 获取 access_token (缓存 30 天)
     token_key = f"baidu_token_{api_key}"
@@ -156,19 +141,7 @@ async def _xiaoai_tts(text: str, voice: str = "冰糖", style: str = "") -> byte
 
 
 async def synthesize(text: str, role: str = "jarvis") -> bytes:
-    """Audio8-TTS 为主 (本地 ONNX CPU), 失败降级百度/Edge-TTS"""
-    # 角色 -> Audio8-TTS 已注册的 voice name
-    audio8_voice_map = {
-        "jarvis": "speaker_a",
-        "girlfriend": "speaker_gf",
-        "selis": "speaker_gf",
-        "yujie": "speaker_gf",
-        "taiwan": "speaker_gf",
-        "xiaohu": "speaker_a",
-        "krab": "speaker_a",
-        "plankton": "speaker_a",
-        "pilaoban": "speaker_a",
-    }
+    """云端 TTS 为主 (百度 ~0.3s), 失败降级 Edge-TTS"""
     # 角色 -> 百度发音人映射 (降级用)
     baidu_voice_map = {
         "jarvis": 106, "girlfriend": 0, "selis": 111, "yujie": 4,
@@ -187,19 +160,10 @@ async def synthesize(text: str, role: str = "jarvis") -> bytes:
         "pilaoban": "zh-CN-YunjianNeural",
     }
 
-    audio8_voice = audio8_voice_map.get(role, "speaker_a")
     baidu_voice = baidu_voice_map.get(role, 106)
     edge_voice = edge_voice_map.get(role, "zh-CN-XiaoxiaoNeural")
 
-    # 1. Audio8-TTS (本地首选)
-    try:
-        audio = await _audio8_tts_synthesize(text, audio8_voice)
-        logger.info(f"[TTS] Audio8-TTS 成功 ({len(audio)} bytes)")
-        return audio
-    except Exception as e:
-        logger.warning(f"[TTS] Audio8-TTS 失败({e}), 降级百度 TTS")
-
-    # 2. 百度 TTS
+    # 1. 百度 TTS (云端首选, ~0.3s)
     try:
         audio = await _baidu_tts_synthesize(text, baidu_voice)
         logger.info(f"[TTS] 百度 TTS 成功 ({len(audio)} bytes)")
@@ -207,7 +171,7 @@ async def synthesize(text: str, role: str = "jarvis") -> bytes:
     except Exception as e:
         logger.warning(f"[TTS] 百度 TTS 失败({e}), 降级 Edge-TTS")
 
-    # 3. Edge-TTS
+    # 2. Edge-TTS (云端兜底)
     try:
         audio = await _edge_tts_synthesize(text, edge_voice)
         logger.info(f"[TTS] Edge-TTS 成功 ({len(audio)} bytes)")

@@ -1,0 +1,22 @@
+# 运行时依赖（部分为 Windows-only）
+fastapi
+uvicorn
+aiohttp
+Pillow
+numpy
+scipy
+psutil
+webview
+pystray
+playwright
+soundcard
+pycaw
+comtypes
+wmi
+pywin32
+
+# 测试
+pytest
+
+# 打包（可选）
+pyinstaller

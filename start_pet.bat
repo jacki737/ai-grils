@@ -1,6 +1,6 @@
 @echo off
 title AI Girlfriend
-cd /d E:\ai-girlfriend
+cd /d "%~dp0"
 
 echo [1/2] starting backend...
 start "AI-backend" /min "D:\py13\python.exe" run_server.py
